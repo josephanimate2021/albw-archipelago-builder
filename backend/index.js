@@ -167,45 +167,19 @@ wss.on('connection', async (ws, req) => {
                     } else if (parsedUrl.query.zipURL) {
                         const res = await fetch.default(decodeURIComponent(parsedUrl.query.zipURL));
                         await continueBuildingWithBuffer(await res.arrayBuffer(), ws);
-                    } else if (parsedUrl.query.useBultInSourceCode) {
-                        const z17randomizerpath = path.join(__dirname, '../z17-randomizer');
-                        const targetPath = path.join(z17randomizerpath, 'target');
-                        if (fs.existsSync(targetPath)) fs.rmSync(targetPath, {
-                            recursive: true,
-                            force: true
+                    } else if (parsedUrl.query.useBultInSourceCode) builder.buildWithBuiltInSourceCode(ws).then(data => {
+                        ws.send("\nPress the enter key to continue.")
+                        ws.on("message", () => {
+                            ws.send(JSON.stringify({
+                                operationSucessful: true,
+                                message: `The z17-randomizer Archipelago build was successful! To download your build, you may click <a download='albw_archipelago.zip' href='data:application/zip;base64,${
+                                    data
+                                }'>here</a>. To start the process again, you may <a href="javascript:location.reload()">reload this page</a>.`
+                            }))
                         });
-                        builder.beginBuildFrom(z17randomizerpath, ws).then(async ZipObject => {
-                            ws.send("\nBuilding your albw.apworld file...");
-                            const zip = new JSZip();
-                            function zipProcess(filePath, zip) {
-                                fs.readdirSync(filePath).forEach(file => {
-                                    const filepath = path.join(filePath, file);
-                                    const stats = fs.lstatSync(filepath);
-                                    if (stats.isDirectory()) zipProcess(filepath, zip.folder(file));
-                                    else zip.file(file, fs.readFileSync(filepath));
-                                    ws.send(`\nZipped\n${filepath}\n`);
-                                })
-                            }
-                            zipProcess(path.join(__dirname, '../albw-archipelago'), zip);
-                            ZipObject.file("albw.apworld", await zip.generateAsync({
-                                type: "nodebuffer"
-                            }));
-                            ZipObject.generateAsync({
-                                type: "base64",
-                                mimeType: "application/zip"
-                            }).then(data => {
-                                ws.send("\nSuccessfuly generated your albw.apworld file! Press the enter key to continue.");
-                                ws.on("message", () => {
-                                    ws.send(JSON.stringify({
-                                        operationSucessful: true,
-                                        message: `The z17-randomizer Archipelago build was successful! To download your build, you may click <a download='albw_archipelago.zip' href='data:application/zip;base64,${
-                                            data
-                                        }'>here</a>. To start the process again, you may <a href="javascript:location.reload()">reload this page</a>.`
-                                    }))
-                                });
-                            })
-                        })
-                    }
+                    }).catch(e => {
+                        console.error(e);
+                    })
                 }
 
             } catch (e) {

@@ -77,5 +77,39 @@ module.exports = {
                 });
             });
         })
+    },
+    buildWithBuiltInSourceCode(ws) {
+        return new Promise((res, rej) => {
+            const z17randomizerpath = path.join(__dirname, '../z17-randomizer');
+            const targetPath = path.join(z17randomizerpath, 'target');
+            if (fs.existsSync(targetPath)) fs.rmSync(targetPath, {
+                recursive: true,
+                force: true
+            });
+            this.beginBuildFrom(z17randomizerpath, ws).then(async ZipObject => {
+                this.sendMessageToClient("Building your albw.apworld file...", ws);
+                const zip = new jszip();
+                function zipProcess(filePath, zip, sendMessageToClient) {
+                    fs.readdirSync(filePath).forEach(file => {
+                        const filepath = path.join(filePath, file);
+                        const stats = fs.lstatSync(filepath);
+                        if (stats.isDirectory()) zipProcess(filepath, zip.folder(file), sendMessageToClient);
+                        else zip.file(file, fs.readFileSync(filepath));
+                        sendMessageToClient(`\nZipped\n${filepath}\n`, ws);
+                    })
+                }
+                zipProcess(path.join(__dirname, '../albw-archipelago'), zip, this.sendMessageToClient);
+                ZipObject.file("albw.apworld", await zip.generateAsync({
+                    type: "nodebuffer"
+                }));
+                ZipObject.generateAsync({
+                    type: "base64",
+                    mimeType: "application/zip"
+                }).then(data => {
+                    this.sendMessageToClient("Successfuly generated your albw.apworld file!", ws);
+                    res(data);
+                })
+            }).catch(rej);
+        })
     }
 }
