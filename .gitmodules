@@ -1,0 +1,7 @@
+[submodule "z17-randomizer"]
+	path = z17-randomizer
+	url = https://github.com/randomsalience/z17-randomizer/
+	branch = archipelago
+[submodule "albw-archipelago"]
+	path = albw-archipelago
+	url = https://github.com/randomsalience/albw-archipelago
