@@ -27,7 +27,8 @@ module.exports = {
           owner: 'josephanimate2021',
           name: 'albw-archipelago-builder'
         },
-        prerelease: true
+        draft: false,
+        prerelease: false
       }
     }
   ]
