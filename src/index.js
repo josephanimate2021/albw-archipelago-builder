@@ -1,5 +1,7 @@
 // Update before running.
-require('update-electron-app')();
+try {
+  require('update-electron-app')();
+} catch {}
 
 // Run the app after update checking.
 const { app, BrowserWindow } = require('electron');
