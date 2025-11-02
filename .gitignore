@@ -94,3 +94,4 @@ out/
 # Other files and folders that are being ignored.
 temp/
 package-lock.json
+albw_archipelago.zip
