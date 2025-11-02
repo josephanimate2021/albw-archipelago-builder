@@ -1,3 +1,7 @@
+// Update before running.
+require('update-electron-app')();
+
+// Run the app after update checking.
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const serverPort = 3000;
