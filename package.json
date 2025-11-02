@@ -1,0 +1,44 @@
+{
+  "name": "albw-archipelago-builder",
+  "productName": "albw-archipelago-builder",
+  "version": "0.0.1",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\"",
+    "test": "node backend/index.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josephanimate2021/albw-archipelago-builder.git"
+  },
+  "keywords": [],
+  "author": "Joseph Crosman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/josephanimate2021/albw-archipelago-builder/issues"
+  },
+  "homepage": "https://github.com/josephanimate2021/albw-archipelago-builder#readme",
+  "description": "This is an app that allows users to create an apworld out of The Legend of Zelda: A Link Between Worlds using the z17-randomizer source code created by rickfay.",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "electron-squirrel-startup": "^1.0.1",
+    "express": "^5.1.0",
+    "jszip": "^3.10.1",
+    "node-fetch": "^3.3.2",
+    "smol-toml": "^1.4.2",
+    "user-agents": "^1.1.669",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "electron": "38.4.0"
+  }
+}
