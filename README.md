@@ -18,7 +18,7 @@ However, if you want to contribute to this app, here are the steps that you can 
 
 ## Downloading builds from recent commits
 This method of running the app is possible if you want to beta test the app. If that's the case, here are the steps below:
-1. Head to the <a href="https://github.com/josephanimate2021/albw-archipelago-builder/actions/workflows/build_beta_app.yml">Build App ror Beta Testing workflow</a> inside the Actions Panel.
+1. Head to the <a href="../../actions/workflows/build_beta_app.yml">Build App ror Beta Testing workflow</a> inside the Actions Panel.
 2. Select a workflow run.
 3. Check that you selected a job based off of your operating system. it should be build_beta_app (OPPERATING_SYSTEM-latest)
 4. scroll on the logs until you see the Upload Artifacts section. if you scroll far enough, you will see a link to click on. This contains the beta build of the app.
