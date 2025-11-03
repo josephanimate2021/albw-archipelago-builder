@@ -1,6 +1,6 @@
 {
   "name": "albw-archipelago-builder",
-  "productName": "albw-archipelago-builder",
+  "productName": "A Link Between Worlds Archipelago Randomizer Builder",
   "version": "0.0.0",
   "main": "src/index.js",
   "scripts": {
