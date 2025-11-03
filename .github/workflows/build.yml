@@ -1,0 +1,35 @@
+name: Build
+
+on: push
+
+permissions:
+ contents: write
+ 
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+          
+      - name: Install npm stuff
+        run: npm install
+        
+      - name: Make artifacts
+        run: npm run make
+        
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-${{ matrix.os }}
+          path: out/make
