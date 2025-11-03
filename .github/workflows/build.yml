@@ -21,7 +21,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 25
-
+          
+      - name: Install npm stuff
+        run: npm install
+        
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -31,4 +34,4 @@ jobs:
       - name: Build and release
         run: npm run publish
         env:
-          GH_TOKEN: ${{ secrets.github_token }}
+          GITHUB_TOKEN: ${{ secrets.github_token }}
