@@ -28,6 +28,7 @@ jobs:
       - name: Make artifacts
         run: npm run make
   release:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Upload artifacts
