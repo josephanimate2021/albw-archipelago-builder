@@ -27,3 +27,5 @@ jobs:
         
       - name: Publish artifacts
         run: npm run publish
+        env:
+         GITHUB_TOKEN: ${{ secrets.github_token }}
