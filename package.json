@@ -1,11 +1,13 @@
 {
   "name": "albw-archipelago-builder",
-  "productName": "A Link Between Worlds Archipelago Randomizer Builder",
+  "productName": "albw-randomizer-builder",
   "version": "0.0.0",
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
+    "package": "electron-forge package",
     "make": "electron-forge make",
+    "publish": "electron-forge publish",
     "lint": "echo \"No linting configured\"",
     "test": "node backend/index.test.js"
   },

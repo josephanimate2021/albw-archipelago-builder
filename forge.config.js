@@ -35,4 +35,17 @@ module.exports = {
       }
     }
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'josephanimate2021',
+          name: 'albw-archipelago-builder'
+        },
+        prerelease: false,
+        draft: false
+      }
+    }
+  ]
 };
