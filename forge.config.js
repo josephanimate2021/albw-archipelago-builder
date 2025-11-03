@@ -1,7 +1,7 @@
 const fs = require("fs");
 const packagerConfig = JSON.parse(fs.readFileSync('./package.json'));
 
-let indexJSForCrossZip = fs.readFileSync('node_modules/cross-zip/index.js').toString();
+let indexJSForCrossZip = fs.readFileSync('node_modules/cross-zip/index.js').toString("utf8");
 indexJSForCrossZip = indexJSForCrossZip.split("fs.rmdir").join("fs.rm");
 fs.writeFileSync('node_modules/cross-zip/index.js', indexJSForCrossZip);
 
