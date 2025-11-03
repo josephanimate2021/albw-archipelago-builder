@@ -3,7 +3,6 @@ const packagerConfig = require("./package.json");
 module.exports = {
   packagerConfig: {},
   rebuildConfig: {},
-  outDir: `${process.platform == "darwin" ? 'macos' : process.platform == "linux" ? 'ubuntu' : process.platform == "win32" ? 'windows' : process.platform}-latest`,
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
