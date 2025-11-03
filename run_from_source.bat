@@ -1,0 +1,3 @@
+@echo off
+echo Beginning the app run from the source...
+node loadApp.js
