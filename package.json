@@ -1,6 +1,6 @@
 {
   "name": "albw-archipelago-builder",
-  "productName": "albw-randomizer-builder",
+  "productName": "albw-archipelago-builder",
   "version": "0.0.0",
   "main": "src/index.js",
   "scripts": {
