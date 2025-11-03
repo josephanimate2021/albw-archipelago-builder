@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: 22
 
+      - name: Perform fixes
+        run: chmod +x node_modules/app-builder-bin/linux/x64/app-builder
       - name: Build/release Electron app
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
