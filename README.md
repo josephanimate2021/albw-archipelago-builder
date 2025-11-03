@@ -13,7 +13,7 @@ However, if you want to contribute to this app, here are the steps that you can 
 2. Download the <a href="../../archive/master.zip">Source Code ZIP File</a>.
 3. Extract the Source Code ZIP file to a folder of your choice.
 4. Go inside the extracted zip file and you should at least see the package.json file along with the README.md file and others if you did things correctly.
-5. Double click on the run_from_source.bat file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
+5. Double click on the run_from_source.bat (or run_from_source.sh if you're not running Windows on your computer) file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
 
 
 ## Downloading builds from recent commits
