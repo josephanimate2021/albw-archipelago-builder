@@ -10,7 +10,7 @@ and then building it that way as some developers won't know what tools you need 
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
 However, if you want to contribute to this app, here are the steps that you can take to run this app from the source:
 1. Download <a href="https://nodejs.org/">Node.JS Version 22 LTS or above</a>.
-2. Download the <a href="./archive/master.zip">Source Code ZIP File</a>.
+2. Download the <a href="../../archive/master.zip">Source Code ZIP File</a>.
 3. Extract the Source Code ZIP file to a folder of your choice.
 4. Go inside the extracted zip file and you should at least see the package.json file along with the README.md file and others if you did things correctly.
 5. Double click on the run_from_source.bat file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
@@ -25,8 +25,8 @@ This method of running the app is possible if you want to beta test the app. If 
 
 ## Downloading builds from releases (Recommended)
 This method of running the app is recommended for most users as you will get a pretty stable app that's ideal for building your ALBW Archipelago. Here is how you can do it:
-1. Head to the <a href="./releases">Releases Tab</a> of this source code.
+1. Head to the <a href="../../releases">Releases Tab</a> of this source code.
 2. Select your desired version to download your files from based off of your operating system. The rest should be self explainitory.
 
 ## Any issues with this app?
-Please head over to the <a href="./issues">Issues tab</a> of this source code to report your issue. Screenshots or a video is recommended.
+Please head over to the <a href="../../issues">Issues tab</a> of this source code to report your issue. Screenshots or a video is recommended.
