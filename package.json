@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
+    "make": "electron-forge make",
     "lint": "echo \"No linting configured\"",
     "test": "node backend/index.test.js"
   },
