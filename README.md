@@ -30,4 +30,4 @@ This method of running the app is recommended for most users as you will get a p
 
 ## Any issues with this app?
 Please head over to the <a href="../../issues">Issues tab</a> of this source code to report your issue. 
-Screenshots or a video is recommended which will then allow me to combine your text and screenshot/video at the same time to better undertstand your issue.
+Screenshots or a video is recommended which will then allow me to combine your text and screenshot/video at the same time in order for me to better undertstand your issue.
