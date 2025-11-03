@@ -1,4 +1,5 @@
-const packagerConfig = require("./package.json");
+const fs = require("fs");
+const packagerConfig = JSON.parse(fs.readFileSync('./package.json'));
 
 module.exports = {
   packagerConfig: {},
@@ -6,6 +7,10 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
+      config: {}
+    },
+    {
+      name: '@electron-forge/maker-wix',
       config: {}
     },
     {

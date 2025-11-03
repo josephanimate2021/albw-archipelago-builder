@@ -23,6 +23,7 @@
   "description": "This is an app that allows users to create an apworld out of The Legend of Zelda: A Link Between Worlds using the z17-randomizer source code created by rickfay.",
   "dependencies": {
     "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-wix": "^7.10.2",
     "adm-zip": "^0.5.16",
     "electron-squirrel-startup": "^1.0.1",
     "express": "^5.1.0",
