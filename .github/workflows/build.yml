@@ -27,11 +27,8 @@ jobs:
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Perform fixes
-        run: npm install app-builder-bin --force
         
       - name: Build and release
-        run: npx electron-builder --no-install --publish=alaways
+        run: npx --no-install electron-builder --publish=alaways
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
