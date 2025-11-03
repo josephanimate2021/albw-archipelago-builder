@@ -42,7 +42,8 @@ module.exports = {
         repository: {
           owner: 'josephanimate2021',
           name: 'albw-archipelago-builder'
-        }
+        },
+        generate_release_notes: true
       }
     }
   ]
