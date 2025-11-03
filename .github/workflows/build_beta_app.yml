@@ -1,4 +1,4 @@
-name: Build
+name: Build App for Beta Testing
 
 on: push
 
@@ -6,7 +6,7 @@ permissions:
  contents: write
  
 jobs:
-  build:
+  build_beta_app:
     runs-on: ${{ matrix.os }}
 
     strategy:
