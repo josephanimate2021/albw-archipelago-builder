@@ -17,20 +17,21 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v5
 
-      - name: Install Node.js, NPM and Yarn
+      - name: Install Node.js and NPM
         uses: actions/setup-node@v6
         with:
           node-version: 25
 
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
       - name: Perform fixes
         run: npm install app-builder-bin --force
-      - name: Build/release Electron app
-        uses: samuelmeuli/action-electron-builder@v1.6.0
-        with:
-          # GitHub token, automatically provided to the action
-          # (No need to define this secret in the repo settings)
-          github_token: ${{ secrets.github_token }}
-
-          # If the commit is tagged with a version (e.g. "v1.0.0"),
-          # release the app after building
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        
+      - name: Build and release
+        run: npx electron-builder --no-install --publish=alaways
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
