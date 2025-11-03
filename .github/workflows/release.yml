@@ -1,0 +1,29 @@
+name: release
+
+on: workflow_dispatch
+
+permissions:
+ contents: write
+ 
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+          
+      - name: Install npm stuff
+        run: npm install
+        
+      - name: Publish artifacts
+        run: npm run publish
