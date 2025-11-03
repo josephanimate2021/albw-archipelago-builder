@@ -1,6 +1,6 @@
-name: Build
+name: release
 
-on: push
+on: workflow_dispatch
 
 permissions:
  contents: write
@@ -25,11 +25,5 @@ jobs:
       - name: Install npm stuff
         run: npm install
         
-      - name: Make artifacts
-        run: npm run make
-        
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: build-${{ matrix.os }}
-          path: out/make
+      - name: Publish artifacts
+        run: npm run publish
