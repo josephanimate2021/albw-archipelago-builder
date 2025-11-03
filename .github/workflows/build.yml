@@ -17,11 +17,6 @@ jobs:
           git config --global core.eol lf
 
       - uses: actions/checkout@v2
-
-      - name: Install npm
-        uses: npm/action-setup@v4
-        with:
-         version: 9
   
       - name: Install Node.js, NPM and pnpm
         uses: actions/setup-node@v4
