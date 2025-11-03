@@ -29,6 +29,6 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         
       - name: Build and release
-        run: npx --no-install electron-builder --publish=alaways
+        run: npm run build --publish=always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
