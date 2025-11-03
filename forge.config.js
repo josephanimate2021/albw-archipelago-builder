@@ -32,23 +32,6 @@ module.exports = {
           homepage: packagerConfig.homepage
         }
       }
-    },
-    {
-      name: '@electron-forge/maker-pkg',
-      config: {}
     }
   ],
-  publishers: [
-    {
-      name: '@electron-forge/publisher-github',
-      config: {
-        repository: {
-          owner: 'josephanimate2021',
-          name: 'albw-archipelago-builder'
-        },
-        draft: false,
-        prerelease: false
-      }
-    }
-  ]
 };
