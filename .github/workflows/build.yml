@@ -25,13 +25,5 @@ jobs:
       - name: Install npm stuff
         run: npm install
         
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        
-      - name: Build and release
-        run: npm run publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+      - name: Make artifacts
+        run: npm run make
