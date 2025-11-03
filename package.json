@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
+    "build": "electron-builder",
     "lint": "echo \"No linting configured\"",
     "test": "node backend/index.test.js"
   },
