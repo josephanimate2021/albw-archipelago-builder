@@ -27,12 +27,9 @@ jobs:
         
       - name: Make artifacts
         run: npm run make
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
+        
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
           name: build
-          path: out/make/
+          path: ${{ matrix.os }}/make/
