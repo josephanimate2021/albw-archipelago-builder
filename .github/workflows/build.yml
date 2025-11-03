@@ -27,9 +27,11 @@ jobs:
         
       - name: Make artifacts
         run: npm run make
-        
+  release:
+    runs-on: ubuntu-latest
+    steps:
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
           name: build
-          path: out/make
+          path: out/make/
