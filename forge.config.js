@@ -6,11 +6,8 @@ module.exports = {
   outDir: `${process.platform == "darwin" ? 'macos' : process.platform == "linux" ? 'ubuntu' : process.platform == "win32" ? 'windows' : process.platform}-latest`,
   makers: [
     {
-      name: '@electron-forge/maker-wix',
-      config: {
-        language: 1033,
-        manufacturer: packagerConfig.author
-      }
+      name: '@electron-forge/maker-squirrel',
+      config: {}
     },
     {
       name: '@electron-forge/maker-zip',
