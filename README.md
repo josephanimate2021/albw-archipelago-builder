@@ -18,7 +18,7 @@ However, if you want to contribute to this app, here are the steps that you can 
 6. Double click on the run_from_source.bat (or run_from_source.sh if you're not running Windows on your computer) file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
 
 ## Building
-If you want to build this app for a different computer operating system or architexture, here is a way to do it:
+If you want to build this app for a different computer operating system or architecture, here is a way to do it:
 1. Open up the build_app.bat (or build_app.sh) file if you're using linux.
 2. Once there, you will be provided with two options:
 * One will be to just package the app which then the app will be located in the out folder.
