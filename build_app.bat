@@ -1,0 +1,3 @@
+@echo off
+echo Loading The App Builder CLI Interface...
+node buildApp.js

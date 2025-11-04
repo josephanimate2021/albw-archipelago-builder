@@ -123,7 +123,8 @@ function emulateTerminal(connection) {
       makeFeedback(false, info.operationSucessful ? 'success' : 'danger', info.message);
       resultField.innerHTML = '';
       resultField.setAttribute('data-installingProgram', info.programToInstall);
-        data.terminalWebsocketConnection = connection;
+      if (info.commandForInstallingProgram) resultField.setAttribute("data-programInstallCommand", encodeURIComponent(info.commandForInstallingProgram));
+      data.terminalWebsocketConnection = connection;
     } catch {}
   }
 }
@@ -169,11 +170,18 @@ function serializeFormData(form) {
  * Launches a file from the utilites folder.
  * @param {string} filename 
  */
-function launchToolFromUtilities(filename, requiresShellRestart = false) {
+function launchToolFromUtilities(filename, requiresShellRestart = false, programUsesCLI = false) {
   const resultField = document.getElementById('resultField');
   const installingProgram = resultField.getAttribute('data-installingProgram');
-  const connection = new WebSocket(serverUrl + '/launchToolFromUtilities?filename=' + encodeURIComponent(filename));
-  if (installingProgram == "rust") {
+  const info = {
+    filename
+  }
+  if (filename == "fromCommand") {
+    delete info.filename;
+    info.runCommand = decodeURIComponent(resultField.getAttribute("data-programInstallCommand"))
+  }
+  const connection = new WebSocket(serverUrl + '/launchToolFromUtilities?' + new URLSearchParams(info).toString());
+  if (programUsesCLI) {
     const terminal = new TerminalEmulator(connection, resultField);
     terminal.otherDataFunction = handleWebSocketData;
   } else connection.onmessage = handleWebSocketData;
@@ -187,7 +195,7 @@ function launchToolFromUtilities(filename, requiresShellRestart = false) {
         data.terminalWebsocketConnection.onmessage = (event) => {
           const info = JSON.parse(event.data);
           if (info.programInstalled) programInstalled(requiresShellRestart, installingProgram);
-          else programInstallCanceled(installingProgram, filename, requiresShellRestart);
+          else programInstallCanceled(installingProgram, filename, requiresShellRestart, programUsesCLI);
         }
         data.terminalWebsocketConnection.send(`is${installingProgram.split(programSubstring1)[0].toUpperCase() + programSubstring1}Installed`);
         resultField.innerHTML = '';
@@ -204,10 +212,10 @@ function launchToolFromUtilities(filename, requiresShellRestart = false) {
  * @param {boolean} requiresShellRestart 
  * @param {WebSocket} connection
  */
-function programInstallCanceled(program, filename, requiresShellRestart = false) {
+function programInstallCanceled(program, filename, requiresShellRestart = false, programUsesCLI = false) {
   makeFeedback(false, 'info', `You canceled the ${program} installer. To relaunch it, you may click <a href="javascript:launchToolFromUtilities('${
     filename
-  }', ${requiresShellRestart})">here</a>.`);
+  }', ${requiresShellRestart}, ${programUsesCLI})">here</a>.`);
 }
 
 /**

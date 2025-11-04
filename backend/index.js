@@ -54,11 +54,11 @@ wss.on('connection', async (ws, req) => {
                  * @param {string} file 
                  * @returns {string}
                  */
-                function textInstallRequired(type, file, shellRestartRequired = false) {
+                function textInstallRequired(type, file, shellRestartRequired = false, programUsesCLI = false) {
                     return `You need to install ${type} in order to be able to build a python module out of the z17-randomizer source code. 
-                    You may begin the installation of rust if you want to by clicking <a href="javascript:launchToolFromUtilities('${file}', ${
+                    You may begin the installation of ${type} if you want to by clicking <a href="javascript:launchToolFromUtilities('${file}', ${
                         shellRestartRequired
-                    })">here</a>.`
+                    }, ${programUsesCLI})">here</a>.`
                 }
 
                 const userHomePath = process.env.HOME || process.env.USERPROFILE;
@@ -99,28 +99,22 @@ wss.on('connection', async (ws, req) => {
                     if (!pathsExist.rustPathExists) {
                         ws.send(JSON.stringify({
                             operationSuccessful: false,
-                            operatingSystemInfo: {
-                                platform: process.platform,
-                                arch: process.arch,
-                            },
                             programToInstall: 'rust',
-                            commandForInstallingProgram: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
+                            commandForInstallingProgram: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
                             message: textInstallRequired(
                                 'rust', 
                                 process.platform == "win32" ? `rustup-init${process.env.PROCESSOR_ARCHITECTURE != "x86" ? `-${
                                     process.env.PROCESSOR_ARCHITECTURE.toLowerCase()
                                 }` : ''}.exe` : `fromCommand`,
+                                true,
                                 true
                             )
                         }))
                     } else if (!pathsExist.pythonPathExists) {
                         ws.send(JSON.stringify({
                             operationSuccessful: false,
-                            operatingSystemInfo: {
-                                platform: process.platform,
-                                arch: process.arch,
-                            },
                             programToInstall: 'Python',
+                            commandForInstallingProgram: `cd ${path.join(__dirname, "../utilities")} && bash pythonCannotBeInstalled.sh`,
                             message: textInstallRequired(
                                 'Python', 
                                 process.platform != "linux" ? `python-3.12.0${(() => {
@@ -130,8 +124,9 @@ wss.on('connection', async (ws, req) => {
                                         }` : '' + '.exe';
                                         case "darwin": return '-macos11.pkg'
                                     }
-                                })()}` : '-install.sh',
-                                true
+                                })()}` : 'fromCommand',
+                                true,
+                                process.platform == "linux"
                             )
                         }));
                     } else if (!pathsExist.pyModuleMaturinExists) {
@@ -192,7 +187,18 @@ wss.on('connection', async (ws, req) => {
             }
             break;
         } case "/launchToolFromUtilities": {
-            shellInit(cmd.spawn(path.join(__dirname, '../utilities', decodeURIComponent(parsedUrl.query.filename))), ws).then(info => ws.send(JSON.stringify(info)));
+            shellInit((() => {
+                if (parsedUrl.query.filename) return cmd.spawn(path.join(__dirname, '../utilities', decodeURIComponent(parsedUrl.query.filename)));
+                if (parsedUrl.query.runCommand) {
+                    const args = parsedUrl.query.runCommand.split(" ");
+                    const command1 = args[0];
+                    args.splice(0, 1);
+                    return cmd.spawn(command1, args, {
+                        shell: true
+                    });
+                }
+                return cmd.spawn("echo", ['I cannot run a program if I don\'t have a command or file from the utilites folder to execute.']);
+            })(), ws).then(info => ws.send(JSON.stringify(info)));
         }
     }
 });

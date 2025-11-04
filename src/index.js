@@ -55,5 +55,8 @@ app.on('window-all-closed', () => {
 });
 
 function isRunningFromSource() {
-  return (process.platform == "win32" && process.env.HOME)
+  return (
+    (process.platform == "win32" && process.env.HOME)
+    || ((process.platform == "linux" || process.platform == "darwin") && process.env.npm_command)
+  );
 }
