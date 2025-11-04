@@ -131,7 +131,7 @@ wss.on('connection', async (ws, req) => {
                         }));
                     } else if (!pathsExist.pyModuleMaturinExists) {
                         ws.send('\nmaturin does not exist inside your Python Path. Installing...\n');
-                        shellInit(cmd.spawn("pip", ['install', 'maturin'], {
+                        shellInit(cmd.spawn(`python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, ['-m', 'pip', 'install', 'maturin'], {
                             shell: true
                         }), ws).then(() => runChecks(true));
                     } else {
