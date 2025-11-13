@@ -82,11 +82,16 @@ wss.on('connection', async (ws, req) => {
                     const pyModuleMaturinExists = (
                         process.platform == "win32" 
                         && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/Scripts/maturin.exe'))
-                    );
+                    ) || (process.platform == "linux" && fs.existsSync(path.join(userHomePath, ".local/lib/python3.12/site-packages/maturin")));
+                    const pyModulePipExists = (
+                        process.platform == "linux" 
+                        && fs.existsSync(path.join(userHomePath, '.local/lib/python3.12/site-packages/pip'))
+                    ) || process.platform == "win32";
                     return {
                         rustPathExists,
                         pythonPathExists,
-                        pyModuleMaturinExists
+                        pyModuleMaturinExists,
+                        pyModulePipExists
                     }
                 }
 
@@ -94,7 +99,7 @@ wss.on('connection', async (ws, req) => {
                  * Runs some checks to ensure that the required programs are installed.
                  */
                 function runChecks(wasRan = false) {
-                    ws.send(`\nChecking${wasRan ? ' again' : ''} to see if you have Python version 3.12, rust, and maturin installed...`);
+                    ws.send(`\nChecking${wasRan ? ' again' : ''} to see if you have Python version 3.12, rust, pip, and maturin installed...`);
                     const pathsExist = checkPathsExistance();
                     if (!pathsExist.rustPathExists) {
                         ws.send(JSON.stringify({
@@ -132,6 +137,11 @@ wss.on('connection', async (ws, req) => {
                     } else if (!pathsExist.pyModuleMaturinExists) {
                         ws.send('\nmaturin does not exist inside your Python Path. Installing...\n');
                         shellInit(cmd.spawn(`python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, ['-m', 'pip', 'install', 'maturin'], {
+                            shell: true
+                        }), ws).then(() => runChecks(true));
+                    } else if (!pathsExist.pyModulePipExists) {
+                        ws.send('\npip does not exist inside your Python Path. Installing...\n');
+                        shellInit(cmd.spawn(`python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, ['-m', 'ensurepip', '--default-pip'], {
                             shell: true
                         }), ws).then(() => runChecks(true));
                     } else {
