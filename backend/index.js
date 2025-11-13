@@ -570,7 +570,11 @@ function continueBuildingWithBuffer(buffer, ws) {
             sendFileModifiedMessage(randoFillerPath.file('location_node.rs'));
             let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
             fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
+            fillerModContents = fillerModContents.replace("const PROGRESSION_EVENTS: usize = 36;", "const PROGRESSION_EVENTS: usize = 37;");
+            fillerModContents = fillerModContents.replace("pub fn prefill_check_map(world_graph: &mut WorldGraph) -> CheckMap {", "pub fn prefill_check_map(world_graph: &WorldGraph) -> CheckMap {");
+            fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
             fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
+            fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', '/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (mut progression_pool, _) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n');
             fillerModContents = fillerModContents.replace(
                 'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
             fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
@@ -590,7 +594,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             sendFileModifiedMessage(randoFillerPath.file('progress.rs'));
             const randoLibPath = path.join(z17randomizerFolder, "randomizer/src/lib.rs");
             let randoLibContents = fs.readFileSync(randoLibPath, "utf-8");
-            randoLibContents = randoLibContents.replace(replace[0], replace[0] + "\nuse crate::filler::location::Location;\nuse crate::filler::progress::Progress;\nuse pyo3::prelude::*;\nuse regex::Regex;");
+            randoLibContents = randoLibContents.replace(replace[0], replace[0] + "\nuse crate::filler::location::Location;\nuse crate::filler::progress::Progress;\nuse pyo3::prelude::*;\nuse regex::Regex;\nuse filler::access_check;");
             randoLibContents = randoLibContents.replace(replace[6], `{PyRandomizable, ${replace[6]}}`);
             randoLibContents = randoLibContents.replace(replace[7], replace[7] + '\n\tstr::FromStr,');
             randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub struct SeedInfo {');
