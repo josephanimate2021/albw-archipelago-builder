@@ -39,7 +39,7 @@ async function runChecks() {
 function startApp() {
     runCommand("start npm start").then(code => {
         if (code == 0) console.log("You chose to close the app. Code was", code);
-        else exitError("The app failed to start.", code);
+        else exitError("The app failed to start. Error Code:", code);
     });
 }
 
