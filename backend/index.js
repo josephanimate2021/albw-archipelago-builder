@@ -600,7 +600,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             randoLibContents = replacePrintlnWithInfo(randoLibContents);
             randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'settings: Default::default(),', archipelagoInfoNone, 3);
             randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'version: VERSION.to_owned(),', archipelagoInfoNone, 3);
-            randoLibContents = randoLibContents.replace(replace[8], replace[8] + `\n\tpub fn is_archipelago(&self) -> bool {\n\t\tself.archipelago_info.is_some()\n\t}\n`)
+            randoLibContents = randoLibContents.replace(replace[8], replace[8] + `\n\tpub fn is_archipelago(&self) -> bool {\n\t\tself.archipelago_info.is_some()\n\t}\n\npub fn is_major_location(&self, loc_name: &str, default: bool) -> bool {\n\tif let Some(info) = &self.archipelago_info {\n\t\tif self.settings.chest_size_matches_contents {\n\t\t\tinfo.items.get(loc_name).map(|item| item.is_major()).unwrap_or(false)\n\t\t} else {\n\t\t\tdefault\n\t\t}\n\t} else {\n\t\tdefault\n\t}\n}`)
             randoLibContents = replaceWithPyClassAndOriginal(
                 randoLibContents, '#[derive(Serialize, Deserialize, Debug)]', fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, 'randomizer/src/lib_stripCharactersFromString.rs'), 'utf-8')
             )
