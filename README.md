@@ -4,13 +4,12 @@ and then building it that way as some developers won't know what tools you need 
 
 ## Current bugs and issues
 * In this app's current state, you cannot build your apworld on versions older than
-v0.4.0. On the branch selection screen
-try avoiding a branch that has it's
+v0.4.0. On the branch selection screen, try avoiding a branch that has it's
 build version older than v0.4.0. I am
 just leaving those in for testing
 purposes to ensure that I can get this
 app to build your Archipelago from
-older versions of the source code.
+older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
 * I am currently not sure if The Legend of Zelda, A Link Between Worlds is playable after this app is used. I will check up on that soon.
 
 ## Running from the source
