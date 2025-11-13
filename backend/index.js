@@ -402,7 +402,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             const unzipedContent = await JSZip.loadAsync(buffer);
             const dirName = process.platform == "linux" ? path.join(process.env.HOME, 'albw-archipelago-builder') : __dirname;
             if (process.platform == "linux" && !fs.existsSync(dirName)) fs.mkdirSync(dirName);
-            const pathToWriteTempFiles = path.join(dirName, '../temp');
+            const pathToWriteTempFiles = path.join(dirName, `${process.platform != "linux" ? '../' : ''}temp`);
             ws.send('\nRemoving some temporary data from\n' + pathToWriteTempFiles);
             if (fs.existsSync(pathToWriteTempFiles)) fs.rmSync(pathToWriteTempFiles, {
                 recursive: true,
