@@ -419,10 +419,10 @@ function continueBuildingWithBuffer(buffer, ws) {
                 }
             }
             ws.send('\nFiles were extracted successfuly! Modifying files for the build...\n');
-            const z17RandomizerAPPiecesFolder = path.join(dirName, "../apPieces/z17-randomizer");
-            const albwArchipelagoAPPiecesFolder = path.join(dirName, "../apPieces/albw-archipelago");
-            const albwArchipelagoBuiltInFolder = path.join(dirName, "../albw-archipelago");
-            const z17randomizerBuiltInFolder = path.join(dirName, "../z17-randomizer");
+            const z17RandomizerAPPiecesFolder = path.join(__dirname, "../apPieces/z17-randomizer");
+            const albwArchipelagoAPPiecesFolder = path.join(__dirname, "../apPieces/albw-archipelago");
+            const albwArchipelagoBuiltInFolder = path.join(__dirname, "../albw-archipelago");
+            const z17randomizerBuiltInFolder = path.join(__dirname, "../z17-randomizer");
             const z17randomizerFolder = path.join(pathToWriteTempFiles, fs.readdirSync(pathToWriteTempFiles)[0]);
             const albwArchipelagoFolder = path.join(pathToWriteTempFiles, "albw-archipelago");
             fs.mkdirSync(albwArchipelagoFolder);
