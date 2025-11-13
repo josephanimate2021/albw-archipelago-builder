@@ -15,17 +15,20 @@ class UserPrefersAPSourceCode {
   makeDisplayJSON(elemName) {
     return {
       elemName,
-      showing: document.getElementById(elemName).style.display
+      showing: document.getElementById(elemName)?.style.display
     }
   }
   elementToggled(formElem) {
-    for (const h of ['branchesSelectionDisplay', 'releaseVersionSelectionDisplay']) {
-      if (this[h].showing == "none") continue;
-      showOrHide(this[h].elemName)
+    if (formElem.getAttribute("data-showSubmitBtnOnClick")) showOrHide('submitBtn', 'block', 'none');
+    else {
+      for (const h of ['branchesSelectionDisplay', 'releaseVersionSelectionDisplay']) {
+        if (this[h].showing == "none") continue;
+        showOrHide(this[h].elemName)
+      }
+      showOrHide('userPrefersBranchCheckbox');
+      showOrHide('genericSummary');
+      showOrHide('userPrefersArchipelago', 'block', 'none')
     }
-    showOrHide('userPrefersBranchCheckbox');
-    showOrHide('genericSummary');
-    showOrHide('userPrefersArchipelago', 'block', 'none')
     function showOrHide(elemName, show1 = 'none', show2 = 'block') {
       document.getElementById(elemName).style.display = formElem.checked ? show1 : show2;
     }
@@ -52,9 +55,11 @@ function buildALBWArchipelagoViaFileExplorerMethod() {
   const connection = new WebSocket(serverUrl + '/openExplorer?' + fileExplorerInfo);
   connection.onmessage = (event) => {
     try {
+      makeFeedback(true);
       beginBuilding(JSON.parse(event.data)[0]);
     } catch (e) {
       console.error(e);
+      makeFeedback(false, "danger", e.toString());
     }
   };
 }
@@ -64,6 +69,7 @@ function buildALBWArchipelagoViaFileExplorerMethod() {
  * @param {HTMLFormElement} formElement 
  */
 function buildALBWArchipelagoViaFormMethod(formElement) {
+  makeFeedback(true);
   const data = serializeFormData(formElement);
   if (data['z17-randomizer-userPrefersBuiltInSourceCodeOption'] == "on") emulateTerminal(new WebSocket(serverUrl + '/beginBuild?useBultInSourceCode=true'))
   else if (data['z17-randomizer-userPrefersBranchOption'] == 'on') getZipURLBeforeBuild(document.getElementById('branch'), data['z17-randomizer-branch']);
@@ -132,15 +138,17 @@ function emulateTerminal(connection) {
 /**
  * Creates a summary for the user on the right side of the page.
  */
-function makeSummary() {
+function makeSummary(onlyInitAPCheckbox = false) {
   userPrefersAPSourceCode = new UserPrefersAPSourceCode();
-  const releaseVersion = document.getElementById('releaseVersion').value;
-  const branch = document.getElementById('branch').value;
-  const userPrefersBranch = document.getElementById('userPrefersBranch').checked;
-  const elemToWorkWith = document.getElementById(userPrefersBranch ? 'branchThatTheUserWillBeUsing' : 'releaseVersionThatTheUserWillBeUsing');
-  elemToWorkWith.getElementsByTagName('span')[0].innerText = userPrefersBranch ? branch : releaseVersion;
-  elemToWorkWith.style.display = 'block';
-  document.getElementById(userPrefersBranch ? 'releaseVersionThatTheUserWillBeUsing' : 'branchThatTheUserWillBeUsing').style.display = 'none';
+  if (!onlyInitAPCheckbox) {
+    const releaseVersion = document.getElementById('releaseVersion').value;
+    const branch = document.getElementById('branch').value;
+    const userPrefersBranch = document.getElementById('userPrefersBranch').checked;
+    const elemToWorkWith = document.getElementById(userPrefersBranch ? 'branchThatTheUserWillBeUsing' : 'releaseVersionThatTheUserWillBeUsing');
+    elemToWorkWith.getElementsByTagName('span')[0].innerText = userPrefersBranch ? branch : releaseVersion;
+    elemToWorkWith.style.display = 'block';
+    document.getElementById(userPrefersBranch ? 'releaseVersionThatTheUserWillBeUsing' : 'branchThatTheUserWillBeUsing').style.display = 'none';
+  }
 }
 
 /**

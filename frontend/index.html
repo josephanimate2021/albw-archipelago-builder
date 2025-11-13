@@ -102,24 +102,23 @@
     <link href="/apBuilder.css" rel="stylesheet">
   </head>
   <body class="bg-body-tertiary" onload="(async () => {
-    const response = await (await fetch('/getGithubStuff', {
+    const response = await (await fetch('/getGithubStuff?forArchipelago=1', {
       method: 'POST',
     })).json();
     if (response.branches && response.releases) {
       document.getElementById('releaseVersion').innerHTML = response.releases.map(out => `<option value='${out.tag_name}' data-zipURL='https:\/\/github.com\/rickfay\/z17-randomizer\/archive\/refs\/tags\/${out.tag_name}.zip'>${out.name}</option>`);
       document.getElementById('branch').innerHTML = response.branches.map(out => `<option value='${out.name}' data-zipURL='https:\/\/github.com\/rickfay\/z17-randomizer\/archive\/refs\/heads\/${out.name}.zip'>${out.name}</option>`);
-      for (const elemName of [
-        'releaseVersionThatTheUserWillBeUsing', 
-        'releaseVersionSelector',
-        'userPrefersBranchCheckbox',
-        'userPrefersAPSourceCodeCheckbox',
-        'submitBtn'
-      ]) document.getElementById(elemName).style.display = 'block';
+      for (const elemName of ['releaseVersionThatTheUserWillBeUsing', 'releaseVersionSelector','userPrefersBranchCheckbox','submitBtn']) document.getElementById(elemName).style.display = 'block';
       makeSummary();
-    } else makeFeedback(false, 'danger', `${response.message || 'A Github Request could not be made due to an unknown error. This is needed in order for you to be able to use all available release versions and branches for the z17 randomizer. Alternatively, you can also choose to use your downloaded z17-randomizer source code file.'}${
-      response.documentation_url ? ` You may click <a href='${response.documentation_url}'>here</a> to learn more about how you can resolve this error.` : ''
-    }`);
-
+    } else {
+      makeFeedback(false, 'danger', `${response.message || 'A Github Request could not be made due to an unknown error. This is needed in order for you to be able to use all available release versions and branches for the z17 randomizer. Alternatively, you can also choose to use your downloaded z17-randomizer source code file.'}${
+        response.documentation_url ? ` You may click <a href='${response.documentation_url}'>here</a> to learn more about how you can resolve this error.` : ''
+      }`);
+      document.getElementById('userPrefersBuiltInSourceCode').setAttribute('data-showSubmitBtnOnClick', true);
+      for (const elemName of ['releaseVersionThatTheUserWillBeUsing', 'releaseVersionSelector','userPrefersBranchCheckbox','branchSelector']) document.getElementById(elemName).remove()
+      makeSummary(true);
+    }
+    document.getElementById('userPrefersAPSourceCodeCheckbox').style.display = 'block'
   })()">
     <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
       <symbol id="check2" viewBox="0 0 16 16">
