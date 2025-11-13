@@ -12,7 +12,7 @@ if (fs.existsSync('.git')) { // Checks for updates if the user cloned this sourc
         if (code == 0) {
             console.log("All updates were checked successfuly!");
             runChecks();
-        } else exitError('All updates have failed to check.', code);
+        } else exitError('All updates have failed to check. Error Code:', code);
     });
 } else runChecks();
 
@@ -26,7 +26,7 @@ async function runChecks() {
         if (code == 0) {
             console.log("All app dependecies were installed successfuly! Starting the app...");
             startApp();
-        } else exitError('All app dependecies have failed to install.', code);
+        } else exitError('All app dependecies have failed to install. Error Code:', code);
     } else {
         console.log("All app dependecies are currently installed. Starting the app...");
         startApp();
