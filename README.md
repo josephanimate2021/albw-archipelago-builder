@@ -3,8 +3,15 @@ This is an application makes the process of building The Legend of Zelda: A Link
 and then building it that way as some developers won't know what tools you need to distribute a rust app as a python module.
 
 ## Current bugs and issues
-* In this app's current state, you cannot build your apworld from newer and older versions of the source code that you would select on either the Release Version or Branch selection options on the homepage.
-  Right now, the recommended option to select for building purposes is "I prefer to use the built in source code for the z17 randomizer for building the archipelago." as that is right now pretty stable.
+* In this app's current state, you cannot build your apworld on versions older than
+v0.4.0. On the branch selection screen
+try avoiding a branch that has it's
+build version older than v0.4.0. I am
+just leaving those in for testing
+purposes to ensure that I can get this
+app to build your Archipelago from
+older versions of the source code.
+* I am currently not sure if The Legend of Zelda, A Link Between Worlds is playable after this app is used. I will check up on that soon.
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
