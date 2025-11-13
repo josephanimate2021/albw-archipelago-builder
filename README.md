@@ -11,6 +11,7 @@ purposes to ensure that I can get this
 app to build your Archipelago from
 older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
 * I am currently not sure if The Legend of Zelda, A Link Between Worlds is playable after this app is used. I will check up on that soon.
+* Currently, building the albw archipelago does not work on Linux for some reason. i am currently working on fixing this issue right now. it should start working for Linux soon.
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
