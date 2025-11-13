@@ -843,7 +843,8 @@ function continueBuildingWithBuffer(buffer, ws) {
                     }
                     return code;
                 })());
-                pyPatchContents = pyPatchContents.replace("OPTIONSDICT", APCompatiableSettings.map(i => `"${i.specific_option_name}"`).join(',\n\t\t\t\t'))
+                const OPTIONSDICT = APCompatiableSettings.map(i => `"${i.specific_option_name}"`).join(',\n\t\t\t\t')
+                pyPatchContents = pyPatchContents.replace("OPTIONSDICT", OPTIONSDICT)
                 pyPatchContents = pyPatchContents.replace("ALBWSpecificOptionsStuff", APCompatiableSettings.map(i => `${i.className}(info["options"]["${i.specific_option_name}"])`).join(',\n\t\t\t'))
                 fs.writeFileSync(path.join(albwArchipelagoFolder, "Patch.py"), pyPatchContents);
                 let pyInitContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "__init__.py"), "utf-8");
@@ -852,6 +853,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                 pyInitContents = pyInitContents.replace("Cracksanity", CrachShuffleInfo.randoSourceClass);
                 pyInitContents = pyInitContents.replace("cracksanity", CrachShuffleInfo.optionName);
                 pyInitContents = pyInitContents.replaceAll("self.options.crack_shuffle", `self.options.${CrachShuffleInfo.specific_option_name}`);
+                pyInitContents = pyInitContents.replace("OPTIONSDICT", OPTIONSDICT)
                 fs.writeFileSync(path.join(albwArchipelagoFolder, "__init__.py"), pyInitContents);
                 function writeStuff(fileOrFolder) {
                     const fileOrFolderPath = fileOrFolder ? path.join(albwArchipelagoBuiltInFolder, fileOrFolder) : albwArchipelagoBuiltInFolder;
