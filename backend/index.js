@@ -485,9 +485,71 @@ async function continueBuildingWithBuffer(buffer, ws) {
     });
     fs.writeFileSync(randoCargoPath, toml.stringify(randoCargoToml));
     sendFileModifiedMessage(randoCargoPath);
-    const randoFillerPath = path.join(z17randomizerFolder, 'randomizer/src/filler');
-    if (fs.existsSync(randoFillerPath)) addpyclass(randoFillerPath, 'cracks.rs');
-    sendFileModifiedMessage(randoFillerPath);
+    const randoFillerPath = {
+        root: path.join(z17randomizerFolder, 'randomizer/src/filler'),
+        file(f) {
+            return path.join(this.root, f)
+        },
+    };
+    if (fs.existsSync(randoFillerPath.file('cracks.rs'))) addpyclass(randoFillerPath.root, 'cracks.rs');
+    sendFileModifiedMessage(randoFillerPath.file('cracks.rs'));
+    let fillerItemContents = fs.readFileSync(randoFillerPath.file('filler_item.rs'), 'utf-8');
+    fillerItemContents = fillerItemContents.replace(replace[1], `pub ${replace[1]}`);
+    fillerItemContents = fillerItemContents.replace(replace[0], replace[0] + "\nuse pyo3::prelude::*;\nuse std::collections::hash_map::DefaultHasher;\nuse std::hash::{Hash, Hasher};");
+    fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, '#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]', 
+        fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/filler/filler_item.rs"), 'utf-8'));
+    fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Item {');
+    fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Goal {');
+    fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Vane {');
+    fillerItemContents = fillerItemContents.replace(replace[2], replace[2] + "\n\tClearTreacherousTower,")
+    fillerItemContents = fillerItemContents.replace(replace[3], replace[3] + '\n\t\t\tSelf::ClearTreacherousTower => "Clear Treacherous Tower",')
+    fillerItemContents += '\n#[pymethods]\nimpl Vane {\n\nfn __hash__(&self) -> u64 {\n\t\tlet mut hasher = DefaultHasher::new();\n\t\tself.hash(&mut hasher);\n\t\thasher.finish()\n\t}\n}';
+    fs.writeFileSync(randoFillerPath.file('filler_item.rs'), fillerItemContents);
+    sendFileModifiedMessage(randoFillerPath.file('filler_item.rs'));
+    let fillerLocationContents = fs.readFileSync(randoFillerPath.file('location.rs'), 'utf-8');
+    fillerLocationContents = fillerLocationContents.replace(replace[0], replace[0] + "\nuse strum::{Display, EnumString};");
+    fillerLocationContents = fillerLocationContents.replace(replace[4], "Display, EnumString, " + replace[4]);
+    fs.writeFileSync(randoFillerPath.file('location.rs'), fillerLocationContents);
+    sendFileModifiedMessage(randoFillerPath.file('location.rs'));
+    let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
+    fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
+    fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
+    fillerModContents = fillerModContents.replace(
+        'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
+    fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
+    sendFileModifiedMessage(randoFillerPath.file('mod.rs'));
+    let fillerProgressionContents = fs.readFileSync(randoFillerPath.file('progress.rs'), 'utf-8');
+    const rustReturnTrueIfArchipelago = 'if self.seed_info.is_archipelago() {\n\t\t\treturn true;\n\t\t}\n\n\t\t';
+    fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let heart_containers', `// Heart containers and heart pieces are not progression items in Archipelago\n\t\t${
+        rustReturnTrueIfArchipelago
+    }\n`, 2)
+    fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::EasternCompass)', rustReturnTrueIfArchipelago);
+    fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::IceCompass)', rustReturnTrueIfArchipelago);
+    fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let purples', 
+        `// Rupees are not progression items in Archipelago, so instead require Treacherous Tower for easy farming\n\t\t${
+            'if self.seed_info.is_archipelago() {\n\t\t\treturn self.has(Goal::ClearTreacherousTower);\n\t\t}\n\n\t\t'
+        }\n`, 2);
+    fs.writeFileSync(randoFillerPath.file('progress.rs'), fillerProgressionContents);
+    sendFileModifiedMessage(randoFillerPath.file('progress.rs'));
+    const randoLibPath = path.join(z17randomizerFolder, "randomizer/src/lib.rs");
+    let randoLibContents = fs.readFileSync(randoLibPath, "utf-8");
+    randoLibContents = randoLibContents.replace(replace[0], replace[0] + "\nuse crate::filler::location::Location;\nuse crate::filler::progress::Progress;\nuse pyo3::prelude::*;\nuse regex::Regex;");
+    randoLibContents = randoLibContents.replace(replace[6], `{PyRandomizable, ${replace[6]}};`);
+    randoLibContents = randoLibContents.replace(replace[7], replace[7] + '\n\tstr::FromStr,');
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub struct SeedInfo {');
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub settings: Settings,', '#[serde(skip_deserializing)]\n\tpub archipelago_info: Option<ArchipelagoInfo>,\n', 1);
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub vane_map: VaneMap,', '#[pyo3(get)]', 1);
+    randoLibContents = randoLibContents.replace("#[derive(Default, Debug)]", "#[derive(Clone, Default, Debug)]");
+    randoLibContents = replacePrintlnWithInfo(randoLibContents);
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'settings: Default::default(),', archipelagoInfoNone, 3);
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'version: VERSION.to_owned(),', archipelagoInfoNone, 3);
+    randoLibContents = randoLibContents.replace(replace[8], replace[8] + `\n\tpub fn is_archipelago(&self) -> bool {\n\t\tself.archipelago_info.is_some()\n\t}\n`)
+    randoLibContents = replaceWithPyClassAndOriginal(
+        randoLibContents, '#[derive(Serialize, Deserialize, Debug)]', fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, 'randomizer/src/lib_stripCharactersFromString.rs'), 'utf-8')
+    )
+    randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub fn patch_seed(', fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/lib_pyStuff.rs"), "utf-8"))
+    fs.writeFileSync(randoLibPath, randoLibContents);
+    sendFileModifiedMessage(randoLibPath);
     ws.send("\nAll files were successfuly modified! Beginning build...");
     builder.beginBuildFrom(z17randomizerFolder, ws).then(async ZipObject => {
         fs.rmSync(z17randomizerFolder, {
