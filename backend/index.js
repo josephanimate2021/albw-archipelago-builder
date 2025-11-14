@@ -408,6 +408,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                     if (!fs.existsSync(workingPath)) fs.mkdirSync(workingPath, {
                         recursive: true
                     });
+                    fs.writeFileSync(path.join(workingPath,'../.gitmodules'), fs.readFileSync(path.join(__dirname,'../.gitmodules')));
                     return workingPath;
                 }
             })();
