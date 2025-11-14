@@ -1,6 +1,7 @@
 {
   "name": "albw-archipelago-builder",
   "productName": "albw-archipelago-builder",
+  "genericName": "The Legend of Zelda: A Link Between Worlds Randomizer Archipelago Builder",
   "version": "0.0.1",
   "main": "src/index.js",
   "scripts": {
