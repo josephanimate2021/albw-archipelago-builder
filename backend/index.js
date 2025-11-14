@@ -395,14 +395,23 @@ function generateGithubResponses(forArchipelago) {
 function continueBuildingWithBuffer(buffer, ws) {
     return new Promise(async (res, rej) => {
         try {
-            function sendFileModifiedMessage(pathToFile, fileModified = true) {
-                ws.send(`\n${fileModified ? 'Modified' : 'Created'}\n${pathToFile}\n`);
-            }
             const apworldSettings = builder.APWorldSettings();
             const unzipedContent = await JSZip.loadAsync(buffer);
-            const dirName = process.platform == "linux" ? path.join(process.env.HOME, 'albw-archipelago-builder') : __dirname;
-            if (process.platform == "linux" && !fs.existsSync(dirName)) fs.mkdirSync(dirName);
-            const pathToWriteTempFiles = path.join(dirName, `${process.platform != "linux" ? '../' : ''}temp`);
+            const dirName = (() => {
+                try {
+                    const workingPath = path.join(__dirname, "test.txt");
+                    fs.writeFileSync(workingPath, "This is a test.");
+                    fs.unlinkSync(workingPath);
+                    return __dirname;
+                } catch {
+                    const workingPath = path.join(process.env.HOME || process.env.USERPROFILE, 'albw-archipelago-builder/backend');
+                    if (!fs.existsSync(workingPath)) fs.mkdirSync(workingPath, {
+                        recursive: true
+                    });
+                    return workingPath;
+                }
+            })();
+            const pathToWriteTempFiles = path.join(dirName, '../temp');
             ws.send('\nRemoving some temporary data from\n' + pathToWriteTempFiles);
             if (fs.existsSync(pathToWriteTempFiles)) fs.rmSync(pathToWriteTempFiles, {
                 recursive: true,
@@ -421,8 +430,9 @@ function continueBuildingWithBuffer(buffer, ws) {
             ws.send('\nFiles were extracted successfuly! Modifying files for the build...\n');
             const z17RandomizerAPPiecesFolder = path.join(__dirname, "../apPieces/z17-randomizer");
             const albwArchipelagoAPPiecesFolder = path.join(__dirname, "../apPieces/albw-archipelago");
-            const albwArchipelagoBuiltInFolder = path.join(__dirname, "../albw-archipelago");
-            const z17randomizerBuiltInFolder = path.join(__dirname, "../z17-randomizer");
+            const albwArchipelagoBuiltInFolder = await gitPathCheck(path.join(__dirname, "../albw-archipelago"));
+            const z17randomizerBuiltInFolder = await gitPathCheck(path.join(__dirname, "../z17-randomizer"));
+            ws.send("\nAll folder checks were done successfuly! Continuing the build...");
             const z17randomizerFolder = path.join(pathToWriteTempFiles, fs.readdirSync(pathToWriteTempFiles)[0]);
             const albwArchipelagoFolder = path.join(pathToWriteTempFiles, "albw-archipelago");
             fs.mkdirSync(albwArchipelagoFolder);
@@ -574,7 +584,8 @@ function continueBuildingWithBuffer(buffer, ws) {
             fillerModContents = fillerModContents.replace("pub fn prefill_check_map(world_graph: &mut WorldGraph) -> CheckMap {", "pub fn prefill_check_map(world_graph: &WorldGraph) -> CheckMap {");
             fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
             fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
-            fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', '/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (mut progression_pool, _) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n');
+            const itemPoolsParams = accessTextFromLine(findTextLineNumber('pub fn fill_all_locations_reachable(', fillerModContents) + 3, fillerModContents).split("(")[1].split(")")[0];
+            fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', `/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (${itemPoolsParams}) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n`);
             fillerModContents = fillerModContents.replace(
                 'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
             fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
@@ -953,6 +964,87 @@ function continueBuildingWithBuffer(buffer, ws) {
                 }
                 fs.writeFileSync(DungeonPath, DungeonContents);
                 sendFileModifiedMessage(DungeonPath);
+            }
+            function sendFileModifiedMessage(pathToFile, fileModified = true) {
+                ws.send(`\n${fileModified ? 'Modified' : 'Created'}\n${pathToFile}\n`);
+            }
+            function gitPathCheck(folder) {
+                return new Promise(async (res, rej) => {
+                    if (!fs.existsSync(path.join(folder, "README.md"))) try {
+                        ws.send(`\nNo files were found inside\n${folder}.\nChecking for Git Existance before making them...`);
+                        if (fs.existsSync(folder)) fs.rmSync(folder, {
+                            recursive: true,
+                            force: true
+                        });
+                        function shellOutput() {
+                            return new Promise(async (res, rej) => {
+                                const gitModules = await (() => {
+                                    return new Promise((res, rej) => {
+                                        const gitModulesFile = fs.readFileSync(path.join(folder, "../.gitmodules"), "utf-8");
+                                        let gitSubmoduleIndex = gitModulesFile.indexOf('[submodule "')
+                                        while (gitSubmoduleIndex > -1) {
+                                            const content = gitModulesFile.substring(gitSubmoduleIndex + 12);
+                                            gitSubmoduleIndex = gitModulesFile.indexOf('[submodule "', gitSubmoduleIndex + 12);
+                                            if (folder.substring(
+                                                folder.lastIndexOf(process.platform == "win32" ? '\\' : '/') + 1
+                                            ) == content.split('"]')[0]) return res({
+                                                url: content.split("url = ")[1]?.split("\n")[0],
+                                                branch: content.split("branch = ")[1]?.split("\n")[0],
+                                                path: content.split("path = ")[1]?.split("\n")[0]
+                                            });
+                                        }
+                                    })
+                                })()
+                                const commands = [path.join(folder, '../'), "&&", "git", "clone", gitModules.url, "--verbose"];
+                                if (gitModules.branch) {
+                                    commands.push("-b");
+                                    commands.push(gitModules.branch)
+                                }
+                                shellInit(cmd.spawn("cd", commands, {
+                                    shell: true
+                                }), ws).then(() => {
+                                    ws.send(`\nFiles were successfuly made in\n${folder}`);
+                                    res();
+                                }).catch(rej);
+                            })
+                        }
+                        function gitExistanceCheck(ranBefore = false) {
+                            return new Promise(async (res, rej) => {
+                                const gitWindowsPath = path.join(process.env.ProgramFiles, "Git");
+                                if ((
+                                    process.platform == "win32"
+                                    && (!fs.existsSync(gitWindowsPath) || fs.readdirSync(gitWindowsPath).length == 1)
+                                )) {
+                                    ws.send(`\nGit does not exist and that is needed to get the latest source code for\n${folder}.\nLaunching The Git Installer${ranBefore ? ' again' : ''}...`);
+                                    switch (process.platform) {
+                                        case "win32": {
+                                            await shellInit(cmd.spawn(path.join(folder, `../utilities/git-${process.env.PROCESSOR_ARCHITECTURE.toLowerCase()}.exe`)), ws).catch(rej);
+                                            ws.send("\nThe Git Installer was closed. Press any key to continue building the app.");
+                                            ws.on("message", async () => res({
+                                                installedApp: await gitExistanceCheck(true)
+                                            }));
+                                        }
+                                    }
+                                } else res();
+                            })
+                        }
+                        const stats = await gitExistanceCheck().catch(rej);
+                        if (!stats) {
+                            ws.send(`\nGit exists on your computer. Using it to get the files for\n${folder}`);
+                            shellOutput().then(() => {
+                                ws.send(`\nFolder check for\n${folder}\nis complete.`);
+                                res(folder);
+                            }).catch(rej)
+                        } else {
+                            ws.send(`\nGit exists on your computer. However, you need to restart this app in order to get the files for \n${
+                                folder
+                            }. Press any key to continue.`);
+                            ws.on("message", () => rej(`Click <a href="javascript:closeApp()">here</a> to close the app.`))
+                        }
+                    } catch (e) {
+                        rej(e);
+                    } else res(folder)
+                })
             }
         } catch (e) {
             rej(e);

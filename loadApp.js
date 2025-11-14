@@ -8,11 +8,16 @@ const fs = require("fs");
 
 if (fs.existsSync('.git')) { // Checks for updates if the user cloned this source code with git.
     console.log('Checking for updates...');
-    runCommand('start git pull --recurse-submodules').then(code => {
+    runCommand('start git pull && git submodule update --remote').then(code => {
         if (code == 0) {
             console.log("All updates were checked successfuly!");
             runChecks();
-        } else exitError('All updates have failed to check. Error Code:', code);
+        } else {
+            console.warn("Could not check for updates due to error code", code);
+            console.log("");
+            console.log("Running the checks without updates...");
+            runChecks();
+        }
     });
 } else runChecks();
 
