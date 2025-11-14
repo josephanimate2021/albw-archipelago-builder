@@ -1,5 +1,5 @@
 # The Legend of Zelda: A Link Between Worlds Archipelago Builder
-This is an application makes the process of building The Legend of Zelda: A Link Between Worlds Randomizer on Archipelago easier by removing most of the ability to modify the z17 randomizer source code manually 
+This is an application that makes the process of building The Legend of Zelda: A Link Between Worlds Randomizer on Archipelago easier by removing most of the ability to modify the z17 randomizer source code manually 
 and then building it that way as some developers won't know what tools you need to distribute a rust app as a python module.
 
 ## Current bugs and issues
@@ -22,16 +22,19 @@ However, if you want to contribute to this app, here are the steps that you can 
 4. Go inside the extracted zip file and you should at least see the package.json file along with the README.md file and others if you did things correctly.
    NOTE: You can also clone this repository by running the ```git clone https://github.com/josephanimate2021/albw-archipelago-builder.git --recurse-submodules``` command inside your terminal to achieve the same result, this will give you the
    benefit of getting updates every time a new commit is created on this repo.
-6. Double click on the run_from_source.bat (or run_from_source.sh if you're not running Windows on your computer) file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
+5. Double click on the run_from_source.bat (or run_from_source.sh if you're not running Windows on your computer) file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
 
 ## Building
 If you want to build this app for a different computer operating system or architecture, here is a way to do it:
-1. Open up the build_app.bat (or build_app.sh) file if you're using linux.
+1. Open up the build_app.bat (or build_app.sh if you're using linux) file.
 2. Once there, you will be provided with two options:
 * One will be to just package the app which then the app will be located in the out folder.
 * Two will be to make the app executable for your computer which tends to take longer which is why it's better to stick with the first option if possible.
 
 ## Downloading builds from recent commits
+
+WARNING: BY DOING THIS METHOD, THIS APP WILL NOT AUTO UPDATE. YOU WILL HAVE TO UPDATE THE APP MANUALLY EVERY SINGLE TIME!!!
+
 This method of running the app is possible if you want to beta test the app. If that's the case, here are the steps below:
 1. Head to the <a href="../../actions/workflows/build_beta_app.yml">Build App for Beta Testing workflow</a> inside the Actions Panel.
 2. Select a workflow run.
