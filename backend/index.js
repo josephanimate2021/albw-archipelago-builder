@@ -430,8 +430,8 @@ function continueBuildingWithBuffer(buffer, ws) {
             ws.send('\nFiles were extracted successfuly! Modifying files for the build...\n');
             const z17RandomizerAPPiecesFolder = path.join(__dirname, "../apPieces/z17-randomizer");
             const albwArchipelagoAPPiecesFolder = path.join(__dirname, "../apPieces/albw-archipelago");
-            const albwArchipelagoBuiltInFolder = await gitPathCheck(path.join(__dirname, "../albw-archipelago"));
-            const z17randomizerBuiltInFolder = await gitPathCheck(path.join(__dirname, "../z17-randomizer"));
+            const albwArchipelagoBuiltInFolder = await gitPathCheck(path.join(dirName, "../albw-archipelago"));
+            const z17randomizerBuiltInFolder = await gitPathCheck(path.join(dirName, "../z17-randomizer"));
             ws.send("\nAll folder checks were done successfuly! Continuing the build...");
             const z17randomizerFolder = path.join(pathToWriteTempFiles, fs.readdirSync(pathToWriteTempFiles)[0]);
             const albwArchipelagoFolder = path.join(pathToWriteTempFiles, "albw-archipelago");
