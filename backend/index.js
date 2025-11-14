@@ -1014,17 +1014,26 @@ function continueBuildingWithBuffer(buffer, ws) {
                                 if ((
                                     process.platform == "win32"
                                     && (!fs.existsSync(gitWindowsPath) || fs.readdirSync(gitWindowsPath).length == 1)
+                                ) || (
+                                    process.platform == "linux" && !fs.existsSync('/usr/bin/git')
                                 )) {
                                     ws.send(`\nGit does not exist and that is needed to get the latest source code for\n${folder}.\nLaunching The Git Installer${ranBefore ? ' again' : ''}...`);
                                     switch (process.platform) {
                                         case "win32": {
                                             await shellInit(cmd.spawn(path.join(folder, `../utilities/git-${process.env.PROCESSOR_ARCHITECTURE.toLowerCase()}.exe`)), ws).catch(rej);
                                             ws.send("\nThe Git Installer was closed. Press any key to continue building the app.");
-                                            ws.on("message", async () => res({
-                                                installedApp: await gitExistanceCheck(true)
-                                            }));
+                                            break;
+                                        } default: {
+                                            ws.send(`I cannot execute your ${
+                                                process.platform
+                                            } git file for you. You can refer to this link for an idea on how to install git on your system. https://git-scm.com/install/${
+                                                process.platform == "darwin" ? 'mac' : process.platform == "linux" ? 'linux' : 'source'
+                                            }\n\nOnce you are done installing git, press any key to continue.`)
                                         }
                                     }
+                                    ws.on("message", async () => res({
+                                        installedApp: await gitExistanceCheck(true)
+                                    }));
                                 } else res();
                             })
                         }
