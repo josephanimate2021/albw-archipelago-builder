@@ -1016,7 +1016,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                                     process.platform == "win32"
                                     && (!fs.existsSync(gitWindowsPath) || fs.readdirSync(gitWindowsPath).length == 1)
                                 ) || (
-                                    process.platform == "linux" && !fs.existsSync('/usr/bin/git')
+                                    process.platform == "linux" && !fs.existsSync('/usr/share/doc/git')
                                 )) {
                                     ws.send(`\nGit does not exist and that is needed to get the latest source code for\n${folder}.\nLaunching The Git Installer${ranBefore ? ' again' : ''}...`);
                                     switch (process.platform) {
