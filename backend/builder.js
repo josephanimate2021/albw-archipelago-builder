@@ -23,7 +23,7 @@ module.exports = {
                 recursive: true,
                 force: true
             });
-            this.shellOutput(cmd.spawn('cd', [buildPath, '&&', 'maturin', 'build'], {
+            this.shellOutput(cmd.spawn('cd', [buildPath, '&&', `python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, '-m', 'maturin', 'build'], {
                 shell: true
             }), ws).then(info => {
                 if (info.code == 0) {
