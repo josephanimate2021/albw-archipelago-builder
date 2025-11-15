@@ -81,7 +81,7 @@ wss.on('connection', async (ws, req) => {
                         pyModuleMaturinExists: (
                             process.platform == "win32" 
                             && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/Scripts/maturin.exe'))
-                        ) || (process.platform == "linux" && fs.existsSync(path.join(userHomePath, ".pyenv/shims")))
+                        ) || (process.platform == "linux" && fs.existsSync(path.join(userHomePath, ".pyenv/shims/maturin")))
                     }
                 }
 
