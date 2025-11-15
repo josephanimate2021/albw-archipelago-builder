@@ -3,7 +3,6 @@ const jszip = require("jszip");
 const admzip = require("adm-zip");
 const fs = require("fs");
 const path = require("path");
-const JSZip = require("jszip");
 
 module.exports = {
     /**
@@ -52,6 +51,10 @@ module.exports = {
                                     this.sendMessageToClient("Your zip file for the albwrandomizer module was successfuly prepared! zipping up the source code for viewing purposes...", ws);
                                     await this.zipStuff(buildPath, zip.folder("z17-randomizer"));
                                     this.sendMessageToClient("The source code was zipped successfuly!", ws)
+                                    if (ws) fs.rmdirSync(buildPath, {
+                                        recursive: true,
+                                        force: true
+                                    })
                                     res(zip);
                                 }
                             })
@@ -126,7 +129,7 @@ module.exports = {
     },
     /**
      * Zips Up the apworld for the albw archipelago after preparing files.
-     * @param {JSZip} ZipObject A JSZIp Object contining files for the albwrandomizer module.
+     * @param {jszip} ZipObject A JSZIp Object contining files for the albwrandomizer module.
      * @param {WebSocket} ws A WebSocket connection
      * @param {string} folderPath A path to the python apworld folder.
      * @returns {Promise<string>} A base64 string representing the zip file.
@@ -134,7 +137,9 @@ module.exports = {
     zipALBWApworld(ZipObject, ws, folderPath = path.join(__dirname, '../albw-archipelago')) {
         return new Promise(async (res, rej) => {
             const albwArchipelagoFolder = ZipObject.folder("albw-archipelago");
-            await this.zipStuff(folderPath, albwArchipelagoFolder, ws);
+            const albwFolder = albwArchipelagoFolder.folder("albw");
+            await this.zipStuff(folderPath, albwFolder, ws);
+            albwFolder.file("archipelago.json", '{"compatible_version": 7, "version": 7, "game": "A Link Between Worlds", "minimum_ap_version": "0.5.0", "maximum_ap_version": "0.7.0"}');
             ZipObject.file("albw.apworld", await albwArchipelagoFolder.generateAsync({
                 type: "nodebuffer"
             }));

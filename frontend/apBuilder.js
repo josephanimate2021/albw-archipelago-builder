@@ -59,7 +59,7 @@ function buildALBWArchipelagoViaFileExplorerMethod() {
       beginBuilding(JSON.parse(event.data)[0]);
     } catch (e) {
       console.error(e);
-      makeFeedback(false, "danger", e.toString());
+      makeFeedback(false, "warning", "Please select a zip file to use with your build");
     }
   };
 }

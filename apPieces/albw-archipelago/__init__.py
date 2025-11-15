@@ -317,9 +317,9 @@ class ALBWWorld(World):
             return 0
         if item == Items.Maiamai and not self.options.maiamai_mayhem:
             return 0
-        if item.itemtype == ItemType.SmallKey and self.options.keysy in [Keysy.option_small, Keysy.option_all]:
+        if item.itemtype == ItemType.SmallKey and self.options.keysy in [Keysy.option_small_keysy, Keysy.option_all_keysy]:
             return 0
-        if item.itemtype == ItemType.BigKey and self.options.keysy in [Keysy.option_big, Keysy.option_all]:
+        if item.itemtype == ItemType.BigKey and self.options.keysy in [Keysy.option_big_keysy, Keysy.option_all_keysy]:
             return 0
         if item == Items.Quake and self.options.initial_crack_state == InitialCrackState.option_open:
             return 0

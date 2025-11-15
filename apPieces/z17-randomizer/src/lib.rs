@@ -3,7 +3,7 @@ use modinfo::settings::{
     RANDO_SETTINGS_CLASSES
 };
 use modinfo::Settings;
-use randomizer::{ArchipelagoInfo, SeedInfo, randomize_pre_fill};
+use randomizer::{ArchipelagoItem, ArchipelagoInfo, SeedInfo, randomize_pre_fill};
 use randomizer::filler::filler_item::{
     Item, Goal, Vane, Crack, PyRandomizable,
     new_item, new_goal, new_vane, new_crack
@@ -19,6 +19,7 @@ pub fn logging_on() {
 fn albwrandomizer(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     M_ADD_CLASS_SETTINGS
     m.add_class::<Settings>()?;
+    m.add_class::<ArchipelagoItem>()?;
     m.add_class::<ArchipelagoInfo>()?;
     m.add_class::<SeedInfo>()?;
     m.add_class::<Item>()?;

@@ -444,7 +444,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             const replace = [
                 ";", "use crate::filler::cracks::Crack;", "AccessLoruleCastleField,", 'Self::AccessLoruleCastleField => "Lorule Castle Field Access",', "PartialEq", 'fn build_layout', "Randomizable", 
                 'use std::{', 'impl SeedInfo {', "cmp", "Instruction", "seed_info.layout.find_single", "SageRosso, SageSeres,", "Result, SeedInfo,", 
-                "fn patch_item_names(patcher: &mut Patcher", "fn patch_event_item_get(patcher: &mut Patcher", "p.has_bell() &&"
+                "fn patch_item_names(patcher: &mut Patcher", "fn patch_event_item_get(patcher: &mut Patcher", "p.has_bell() &&", ".get($key, SUBREGION)"
             ];
             const archipelagoInfoNone = 'archipelago_info: None,';
             if (fs.existsSync(plandoPath)) {
@@ -558,6 +558,30 @@ function continueBuildingWithBuffer(buffer, ws) {
             let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
             fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
             fillerModContents = fillerModContents.replace("const PROGRESSION_EVENTS: usize = 36;", "const PROGRESSION_EVENTS: usize = 37;");
+            fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
+                "fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
+            fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
+                "pub fn apply<F>(self, patcher: &mut Patcher, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
+            for (const boolean of [false, true]) {
+                fillerModContents = fillerModContents.replace(`self.prep_chest(filler_item.into().unwrap(), course, stage, unq, ${boolean}, seed_info)?;`, 
+                    `let is_big = seed_info.is_major_location(loc_name, ${boolean});\n\t\t\tself.prep_chest(filler_item.into().unwrap(), course, stage, unq, is_big, seed_info)?;`)
+            }
+            for (const info of [
+                {
+                    beg: 'self',
+                    mid: 'patch',
+                    end: 'clone'
+                },
+                {
+                    beg: 'patcher',
+                    mid: 'self',
+                    end: 'into'
+                }
+            ]) fillerModContents = fillerModContents.replace(`${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}())?;`, 
+                `${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}(), loc_name)?;`)
+            fillerModContents = fillerModContents.replace("SeedInfo { settings, .. }: &SeedInfo,", "SeedInfo { settings, archipelago_info, .. }: &SeedInfo,")
+            fillerModContents = fillerModContents.replace("let chest_data = if settings.chest_size_matches_contents {", 
+                "let chest_data = if settings.chest_size_matches_contents && archipelago_info.is_none() {")
             fillerModContents = fillerModContents.replace("pub fn prefill_check_map(world_graph: &mut WorldGraph) -> CheckMap {", "pub fn prefill_check_map(world_graph: &WorldGraph) -> CheckMap {");
             fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
             fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
@@ -580,6 +604,11 @@ function continueBuildingWithBuffer(buffer, ws) {
                 }\n`, 2);
             fs.writeFileSync(randoFillerPath.file('progress.rs'), fillerProgressionContents);
             sendFileModifiedMessage(randoFillerPath.file('progress.rs'));
+            /* This is causing so many building errors with the source code for some reason, but I will reconsider adding this back soon as it was part of commit #20ad861
+            on the archipelago branch of caroline's fork of the z17 randomizer source code.
+            const regionsModPath = path.join(z17randomizerFolder, "randomizer/src/regions/mod.rs");
+            fs.writeFileSync(regionsModPath, fs.readFileSync(regionsModPath, "utf-8").replace(replace[17], replace[17] + ",\n\t\t\t\t\t$key,"));
+            sendFileModifiedMessage(regionsModPath)*/
             const randoLibPath = path.join(z17randomizerFolder, "randomizer/src/lib.rs");
             let randoLibContents = fs.readFileSync(randoLibPath, "utf-8");
             randoLibContents = randoLibContents.replace(replace[0], replace[0] + "\nuse crate::filler::location::Location;\nuse crate::filler::progress::Progress;\nuse pyo3::prelude::*;\nuse regex::Regex;\nuse filler::access_check;");
@@ -784,6 +813,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                 for (let i = 0; i < APCompatiableSettings.length; i++) {
                     if (!APCompatiableSettings[i]) APCompatiableSettings.splice(i, 1);
                 }
+                console.log(APCompatiableSettings)
                 OptionsPyContents = OptionsPyContents.replace("ALBWOPTIONS", APCompatiableSettings.map(i => {
                     return `class ${i.className}(${i.classParam}):\n\t"""${i.desc}"""\n\tdisplay_name = "${i.displayName}"${(() => {
                         let stuff = '';
