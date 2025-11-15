@@ -23,9 +23,7 @@ module.exports = {
                 recursive: true,
                 force: true
             });
-            this.shellOutput(cmd.spawn('cd', [buildPath, '&&', `python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, '-m', 'maturin', 'build'], {
-                shell: true
-            }), ws).then(info => {
+            this.executeCommand(`cd ${buildPath} && ${this.pythonExec()} -m maturin build`, ws).then(info => {
                 if (info.code == 0) {
                     this.sendMessageToClient("The build was successful! Preparing your zip file for the albwrandomizer module...\n", ws);
                     const zip = new jszip();
@@ -63,6 +61,41 @@ module.exports = {
             });
         })
     },
+    async executeCommand(command, ws) {
+        const args = command.split(" ");
+        const args0 = args[0];
+        args.splice(0, 1);
+        return await this.shellInit(cmd.spawn(args0, args, {
+            shell: true
+        }), ws)
+    },
+    /**
+     * loads a user's shell using the provided ChildProcess.
+     * @param {cmd.ChildProcess} shell - the ChildProcess shell
+     * @param {Function} callbackOnClose - the callback function that is provided on close.
+     * @param {WebSocket} ws - a WebSocket connection that is used to send messages to the client.
+     * @returns {Promise<object>} A JSON Object that tells the program that the shell has ended.
+     */
+    shellInit(shell, ws) {
+        return new Promise((res, rej) => {
+            shell.stdin.setEncoding("utf8")
+            ws.on('message', c => shell.stdin.write(c + "\n"));
+            shell.stdout.setEncoding("utf8")
+            shell.stdout.on('data', o => ws.send('\n' + o));
+            shell.stderr.setEncoding("utf8")
+            shell.stderr.on('data', e => ws.send('\n' + e));
+            shell.stdout.on("close", code => {
+                shell.kill();
+                res({
+                    code,
+                    programEnded: true
+                });
+            })
+        })
+    },
+    pythonExec() {
+        return `${process.platform == "linux" ? 'pyenv exec ' : ''}python${process.platform == "darwin" ? 3 : ''}`
+    },
     /**
      * Sends a message to the client via a WebSocket connection (From Client Side) or CLI (Testing only)
      * @param {string} msg The message to send
@@ -71,27 +104,6 @@ module.exports = {
      */
     sendMessageToClient(msg, ws, error = false) {
         ws ? ws.send(`\n${msg}`) : console[error ? 'error' : 'log'](msg);
-    },
-    /**
-     * 
-     * @param {cmd.ChildProcess} shell A process provided by the child_process module.
-     * @param {WebSocket} ws A WebSocket connection for sending messages to the client.
-     * @returns {Promise} A JSON object repersenting whatever ot not the program has ended.
-     */
-    shellOutput(shell, ws) {
-        return new Promise((res, rej) => {
-            shell.stdout.setEncoding("utf8")
-            shell.stdout.on('data', o => this.sendMessageToClient('\n' + o, ws));
-            shell.stderr.setEncoding("utf8")
-            shell.stderr.on('data', e => this.sendMessageToClient('\n' + e, ws, true));
-            shell.stdout.on("close", code => {
-                shell.kill();
-                res({
-                    code,
-                    programEnded: true
-                });
-            });
-        })
     },
     /**
      * Builds the albw archipelago apworld using the built in source code.

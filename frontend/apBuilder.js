@@ -268,3 +268,9 @@ function closeApp() {
     method: "POST"
   })
 }
+
+function downloadFile(elem) {
+  fetch(`/downloadFile?data=${elem.getAttribute('data-base64')}`,{
+    method: "POST"
+  });
+}

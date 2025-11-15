@@ -36,7 +36,7 @@ wss.on('connection', async (ws, req) => {
         case "/openExplorer": {
             const info = Object.assign(parsedUrl.query, JSON.parse(parsedUrl.query.anythingToDump), {
                 properties: [
-                    'openFile',
+                    parsedUrl.query.askForDirectory ? 'openDirectory' : 'openFile',
                     'promptToCreate',
                     'createDirectory',
                     'treatPackageAsDirectory'
@@ -66,32 +66,22 @@ wss.on('connection', async (ws, req) => {
                 /**
                  * Checks to see if any important paths are existant 
                  * (Keep in mind that keeping the required programs in their default paths is recommended for most people).
+                 * @returns {Object} a JSON Object containing booleans for existant paths.
                  */
                 function checkPathsExistance() {
-                    const rustPathExists = fs.existsSync(path.join(userHomePath, '.cargo/bin'));
-                    const pythonPathExistsWin = fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/'));
-                    const pythonPathExistsMac = fs.existsSync('/Library/Frameworks/Python.framework/Versions/3.12');
-                    const pythonPathExistsLinux = fs.existsSync('/usr/bin/python3.12');
-                    const pythonPathExists = (
-                        process.platform == "darwin" && pythonPathExistsMac
-                    ) || (
-                        process.platform == "win32" && pythonPathExistsWin
-                    ) || (
-                        process.platform == "linux" && pythonPathExistsLinux
-                    );
-                    const pyModuleMaturinExists = (
-                        process.platform == "win32" 
-                        && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/Scripts/maturin.exe'))
-                    ) || (process.platform == "linux" && fs.existsSync(path.join(userHomePath, ".local/lib/python3.12/site-packages/maturin")));
-                    const pyModulePipExists = (
-                        process.platform == "linux" 
-                        && fs.existsSync(path.join(userHomePath, '.local/lib/python3.12/site-packages/pip'))
-                    ) || process.platform == "win32";
                     return {
-                        rustPathExists,
-                        pythonPathExists,
-                        pyModuleMaturinExists,
-                        pyModulePipExists
+                        rustPathExists: fs.existsSync(path.join(userHomePath, '.cargo/bin')),
+                        pythonPathExists: (
+                            process.platform == "darwin" && fs.existsSync('/Library/Frameworks/Python.framework/Versions/3.12')
+                        ) || (
+                            process.platform == "win32" && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/'))
+                        ) || (
+                            process.platform == "linux" && fs.existsSync(path.join(userHomePath, '.pyenv'))
+                        ),
+                        pyModuleMaturinExists: (
+                            process.platform == "win32" 
+                            && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/Scripts/maturin.exe'))
+                        ) || (process.platform == "linux" && fs.existsSync(path.join(userHomePath, ".pyenv/shims")))
                     }
                 }
 
@@ -119,7 +109,7 @@ wss.on('connection', async (ws, req) => {
                         ws.send(JSON.stringify({
                             operationSuccessful: false,
                             programToInstall: 'Python',
-                            commandForInstallingProgram: `cd ${path.join(__dirname, "../utilities")} && bash pythonCannotBeInstalled.sh`,
+                            commandForInstallingProgram: `cd ${path.join(__dirname, "../utilities")} && bash python_linux.sh`,
                             message: textInstallRequired(
                                 'Python', 
                                 process.platform != "linux" ? `python-3.12.0${(() => {
@@ -130,20 +120,13 @@ wss.on('connection', async (ws, req) => {
                                         case "darwin": return '-macos11.pkg'
                                     }
                                 })()}` : 'fromCommand',
-                                true,
+                                process.platform != "linux",
                                 process.platform == "linux"
                             )
                         }));
                     } else if (!pathsExist.pyModuleMaturinExists) {
                         ws.send('\nmaturin does not exist inside your Python Path. Installing...\n');
-                        shellInit(cmd.spawn(`python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, ['-m', 'pip', 'install', 'maturin'], {
-                            shell: true
-                        }), ws).then(() => runChecks(true));
-                    } else if (!pathsExist.pyModulePipExists) {
-                        ws.send('\npip does not exist inside your Python Path. Installing...\n');
-                        shellInit(cmd.spawn(`python${process.platform == "linux" ? '3.12' : process.platform == "darwin" ? 3 : ''}`, ['-m', 'ensurepip', '--default-pip'], {
-                            shell: true
-                        }), ws).then(() => runChecks(true));
+                        builder.executeCommand(`${builder.pythonExec()} -m pip install maturin`, ws).then(() => runChecks(true));
                     } else {
                         ws.send('\nAll required programs are installed. Beginning Archipelago Build for\nThe Legend of Zelda: A Link Between Worlds...');
                         buildStart();
@@ -179,14 +162,30 @@ wss.on('connection', async (ws, req) => {
                  * @param {Base64URLString} data the data recieved from jszip.
                  */
                 function buildFinished(data) {
-                    ws.send("\nPress the enter key to continue.")
+                    ws.send("\nPress the enter key to download your build. You can do this as many times as you like. If you want to start the build process again, use the ctrl + r keyboard shortcut to reload this app.")
                     ws.on("message", () => {
-                        ws.send(JSON.stringify({
-                            operationSucessful: true,
-                            message: `The z17-randomizer Archipelago build was successful! To download your build, you may click <a download='albw_archipelago.zip' href='data:application/zip;base64,${
-                                data
-                            }'>here</a>. To start the process again, you may <a href="javascript:location.reload()">reload this page</a>.`
-                        }))
+                        electron.dialog.showSaveDialog({
+                            title: "Choose a File Location to Save Your Build",
+                            buttonLabel: "Save Build",
+                            filters: [
+                                {
+                                    name: "albw_archipelago.zip",
+                                    extensions: ['zip']
+                                }
+                            ],
+                            properties: [
+                                'showHiddenFiles',
+                                'showOverwriteConfirmation',
+                                'createDirectory',
+                                'treatPackageAsDirectory'
+                            ]
+                        }).then(info => {
+                            if (info.canceled) ws.send("\nDon't worry, you can still save your build if you press the enter key.");
+                            if (info.filePath) {
+                                fs.writeFileSync(info.filePath, Buffer.from(data, "base64"));
+                                ws.send(`\nYou have saved your build in\n${info.filePath}.\nFeel free to save another copy of your build if you want.`)
+                            }
+                        })
                     });
                 }
                 /**
@@ -214,7 +213,7 @@ wss.on('connection', async (ws, req) => {
             }
             break;
         } case "/launchToolFromUtilities": {
-            shellInit((() => {
+            builder.shellInit((() => {
                 if (parsedUrl.query.filename) return cmd.spawn(path.join(__dirname, '../utilities', decodeURIComponent(parsedUrl.query.filename)));
                 if (parsedUrl.query.runCommand) {
                     const args = parsedUrl.query.runCommand.split(" ");
@@ -232,9 +231,9 @@ wss.on('connection', async (ws, req) => {
 
 /**
  * Core for the app
- * @param {number} serverPort 
- * @param {electron.BrowserWindow} mainWindow 
- * @param {Function} isRunningFromSource 
+ * @param {number} serverPort - the port for the app
+ * @param {electron.BrowserWindow} mainWindow - the window from electron
+ * @param {Function} isRunningFromSource - a function that returns a boolean stating whatever or not the user is running the app straight from the source code.
  */
 module.exports = (serverPort, mainWindow, isRunningFromSource) => {
     app.use((req, _, next) => {
@@ -263,29 +262,6 @@ module.exports = (serverPort, mainWindow, isRunningFromSource) => {
         mainWindow.loadURL('http://localhost:' + serverPort);
         console.log('App is listening on port ' + serverPort + '.');
     });
-}
-
-/**
- * loads a user's shell using the provided ChildProcess.
- * @param {cmd.ChildProcess} shell 
- * @param {Function} callbackOnClose 
- * @param {WebSocket} ws 
- */
-function shellInit(shell, ws) {
-    return new Promise((res, rej) => {
-        shell.stdin.setEncoding("utf8")
-        ws.on('message', c => shell.stdin.write(c + "\n"));
-        shell.stdout.setEncoding("utf8")
-        shell.stdout.on('data', o => ws.send('\n' + o));
-        shell.stderr.setEncoding("utf8")
-        shell.stderr.on('data', e => ws.send('\n' + e));
-        shell.stdout.on("end", () => {
-            shell.kill();
-            res({
-                programEnded: true
-            });
-        })
-    })
 }
 
 /**
@@ -1001,7 +977,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                                     commands.push("-b");
                                     commands.push(gitModules.branch)
                                 }
-                                shellInit(cmd.spawn("cd", commands, {
+                                builder.shellInit(cmd.spawn("cd", commands, {
                                     shell: true
                                 }), ws).then(() => {
                                     ws.send(`\nFiles were successfuly made in\n${folder}`);
@@ -1028,7 +1004,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                                     ws.send(`\nGit does not exist and that is needed to get the latest source code for\n${folder}.\nLaunching The Git Installer${ranBefore ? ' again' : ''}...`);
                                     switch (process.platform) {
                                         case "win32": {
-                                            await shellInit(cmd.spawn(path.join(folder, `../utilities/git-${process.env.PROCESSOR_ARCHITECTURE.toLowerCase()}.exe`)), ws).catch(rej);
+                                            await builder.shellInit(cmd.spawn(path.join(folder, `../utilities/git-${process.env.PROCESSOR_ARCHITECTURE.toLowerCase()}.exe`)), ws).catch(rej);
                                             ws.send("\nThe Git Installer was closed. Press any key to continue building the app.");
                                             break;
                                         } default: {
