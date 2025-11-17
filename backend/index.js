@@ -549,12 +549,15 @@ function continueBuildingWithBuffer(buffer, ws) {
             fillerLocationContents = fillerLocationContents.replace(replace[4], "Display, EnumString, " + replace[4]);
             fs.writeFileSync(randoFillerPath.file('location.rs'), fillerLocationContents);
             sendFileModifiedMessage(randoFillerPath.file('location.rs'));
-            let fillerLocationNodeContents = fs.readFileSync(randoFillerPath.file('location_node.rs'), 'utf-8');
-            fillerLocationNodeContents = putTextIntoLine(25, "&self.paths", fillerLocationNodeContents, true);
-            fillerLocationNodeContents = putTextIntoLine(24, "pub fn get_paths(&self) -> &Option<Vec<Path>> {", fillerLocationNodeContents, true);
-            fillerLocationNodeContents = fillerLocationNodeContents.replace(replace[4], "Display, EnumString, " + replace[4]);
-            fs.writeFileSync(randoFillerPath.file('location_node.rs'), fillerLocationNodeContents);
-            sendFileModifiedMessage(randoFillerPath.file('location_node.rs'));
+            for (const pathName of [randoFillerPath.file('location_node.rs'), path.join(z17randomizerFolder, "randomizer/src/model/location_node.rs")]) {
+                if (!fs.existsSync(pathName)) continue;
+                let fillerLocationNodeContents = fs.readFileSync(pathName, 'utf-8');
+                fillerLocationNodeContents = putTextIntoLine(25, "&self.paths", fillerLocationNodeContents, true);
+                fillerLocationNodeContents = putTextIntoLine(24, "pub fn get_paths(&self) -> &Option<Vec<Path>> {", fillerLocationNodeContents, true);
+                fillerLocationNodeContents = fillerLocationNodeContents.replace(replace[4], "Display, EnumString, " + replace[4]);
+                fs.writeFileSync(pathName, fillerLocationNodeContents);
+                sendFileModifiedMessage(pathName);
+            }
             let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
             fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
             fillerModContents = fillerModContents.replace("const PROGRESSION_EVENTS: usize = 36;", "const PROGRESSION_EVENTS: usize = 37;");
