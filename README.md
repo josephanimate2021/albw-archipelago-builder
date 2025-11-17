@@ -10,7 +10,7 @@ just leaving those in for testing
 purposes to ensure that I can get this
 app to build your Archipelago from
 older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
-* Randomizing The Legend of Zelda: A Link Between Worlds currently isn't possible after generating a new patch file. I am not sure why that is, but for now you may  choose to build with the built in source code as that part of this app works fine.
+* Randomizing The Legend of Zelda: A Link Between Worlds currently isn't possible after generating a new patch file with Archipelago and then opening it in Archipelago. I am not sure why that is, but for now you may choose to build with the built in source code as that part of this app works fine.
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
