@@ -51,7 +51,7 @@ module.exports = {
                                     this.sendMessageToClient("Your zip file for the albwrandomizer module was successfuly prepared! zipping up the source code for viewing purposes...", ws);
                                     await this.zipStuff(buildPath, zip.folder("z17-randomizer"));
                                     this.sendMessageToClient("The source code was zipped successfuly!", ws)
-                                    if (ws) fs.rmdirSync(buildPath, {
+                                    if (buildPath.includes("\\temp\\") || buildPath.includes("/temp/")) fs.rmdirSync(buildPath, {
                                         recursive: true,
                                         force: true
                                     })
@@ -233,10 +233,10 @@ module.exports = {
                     "one_trial_required",
                     "two_trials_required",
                     "three_trials_required",
-                    "four_trials_required",
+                    "all_trials_required",
                     "open_from_both_sides"
                 ],
-                default_option: "open_from_inside_only"
+                default_option: "all_trials_required"
             },
             lc_requirement: {
                 desc: "Determines the number of Sages that must be rescued to open the front door to Lorule Castle. A red X will appear by the dungeon door on the bottom screen map to indicate when this requirement has been met.",
@@ -297,7 +297,7 @@ module.exports = {
                     "vanilla",
                     "off"
                 ],
-                default_option: "shuffled",
+                default_option: "vanilla",
             },
             maiamai_limit: {
                 desc: "Places a limit on the maximum number of Maiamai a player may have to collect to complete a seed *IF* they do not spend them foolishly.\n\

@@ -794,6 +794,11 @@ function continueBuildingWithBuffer(buffer, ws) {
             worldModContents = putTextIntoLine(94, '\tworld.compute_check_map();', worldModContents);
             fs.writeFileSync(worldModPath, worldModContents);
             sendFileModifiedMessage(worldModPath);
+            const worldTurtlePath = path.join(z17randomizerFolder, "randomizer/src/world/turtle.rs");
+            let worldTurtleContents = fs.readFileSync(worldTurtlePath, "utf-8");
+            worldTurtleContents = worldTurtleContents.replaceAll("p.has_turtle_keys(1)", "p.has_turtle_keys(3)");
+            fs.writeFileSync(worldTurtlePath, worldTurtleContents);
+            sendFileModifiedMessage(worldTurtlePath);
             const romFlagPath = path.join(z17randomizerFolder, "rom/src/flag.rs");
             fs.writeFileSync(romFlagPath, replaceWithPyClassAndOriginal(fs.readFileSync(romFlagPath, "utf-8"), '920: WV_YOUR_HOUSE,', '861: NPC_HINOX,\n\t\t862: ZELDA_BOW,', 2));
             sendFileModifiedMessage(romFlagPath);
@@ -858,6 +863,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                             code1 += `options.${setting.specific_option_name}.value`;
                             if (setting.randoSourceClass == "bool") code1 += ')';
                             code += `\n\n\tsettings.${setting.optionName} = ${code1}`;
+                            if (setting.optionName == "lc_requirement") code += `\n\tsettings.yuganon_requirement = ${code1}`
                         }
                     }
                     return code;
@@ -884,6 +890,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                 let pyInitContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "__init__.py"), "utf-8");
                 const CrachShuffleInfo = APCompatiableSettings.find(i => i.options?.find(d => d == "any_world_pairs"))
                 pyInitContents = pyInitContents.replaceAll("CrackShuffle", CrachShuffleInfo.className);
+                pyInitContents = pyInitContents.replace("Crack Shuffle", CrachShuffleInfo.displayName)
                 pyInitContents = pyInitContents.replace("Cracksanity", CrachShuffleInfo.randoSourceClass);
                 pyInitContents = pyInitContents.replace("cracksanity", CrachShuffleInfo.optionName);
                 pyInitContents = pyInitContents.replaceAll("self.options.crack_shuffle", `self.options.${CrachShuffleInfo.specific_option_name}`);
