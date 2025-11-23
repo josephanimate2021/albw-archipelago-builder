@@ -10,7 +10,7 @@ just leaving those in for testing
 purposes to ensure that I can get this
 app to build your Archipelago from
 older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
-* Randomizing The Legend of Zelda: A Link Between Worlds currently isn't possible after generating a new patch file with Archipelago and then opening it in Archipelago. I am not sure why that is, but for now you may choose to build with the built in source code as that part of this app works fine.
+* When v0.4.1 beta is used, generating a patch file with Archipelago does not work because a check called Stylish Woman (Repeat) was not placed in the albw-archipelago source code's Locations.py file. Right now generating a new patch file works with versions specific to version v0.4.0 of the z17 randomizer even though it may not look like it when ran inside the generate_early function within the __init__.py file inside the albw-archipelago source code. I will plan on fixing this once I know the course id for that check.
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 

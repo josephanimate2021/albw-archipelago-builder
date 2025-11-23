@@ -89,7 +89,7 @@ wss.on('connection', async (ws, req) => {
                  * Runs some checks to ensure that the required programs are installed.
                  */
                 function runChecks(wasRan = false) {
-                    ws.send(`\nChecking${wasRan ? ' again' : ''} to see if you have Python version 3.12, rust, pip, and maturin installed...`);
+                    ws.send(`\nChecking${wasRan ? ' again' : ''} to see if you have Python version 3.12.x, rust, and maturin installed...`);
                     const pathsExist = checkPathsExistance();
                     if (!pathsExist.rustPathExists) {
                         ws.send(JSON.stringify({
@@ -389,14 +389,8 @@ function continueBuildingWithBuffer(buffer, ws) {
                 }
             })();
             const pathToWriteTempFiles = path.join(dirName, '../temp');
-            ws.send('\nRemoving some temporary data from\n' + pathToWriteTempFiles);
-            if (fs.existsSync(pathToWriteTempFiles)) fs.rmSync(pathToWriteTempFiles, {
-                recursive: true,
-                force: true
-            });
-            ws.send('\nDeleted some temporary data. Creating a new temporary folder in\n' + pathToWriteTempFiles);
             fs.mkdirSync(pathToWriteTempFiles);
-            ws.send('\nTemporary folder was created. Extracting the z17-randomizer files...\n')
+            ws.send('\nExtracting the z17-randomizer files before the build...\n')
             for (const folderOrFile in unzipedContent.files) {
                 const fileOrFolderPath = path.join(pathToWriteTempFiles, folderOrFile);
                 if (!fs.existsSync(fileOrFolderPath)) {
@@ -808,6 +802,21 @@ function continueBuildingWithBuffer(buffer, ws) {
             ws.send("\nAll files were successfuly modified! Beginning app build...");
             builder.beginBuildFrom(z17randomizerFolder, ws).then(async ZipObject => {
                 ws.send('\nPreparing your apworld file...');
+                function writeStuff(fileOrFolder) {
+                    const fileOrFolderPath = fileOrFolder ? path.join(albwArchipelagoBuiltInFolder, fileOrFolder) : albwArchipelagoBuiltInFolder;
+                    const workingPath = fileOrFolder ? path.join(albwArchipelagoFolder, fileOrFolder) : albwArchipelagoFolder;
+                    for (const file of fs.readdirSync(fileOrFolderPath)) {
+                        const dir = path.join(fileOrFolderPath, file);
+                        const workingDir = path.join(workingPath, file);
+                        if (fs.existsSync(workingDir)) continue;
+                        const stats = fs.lstatSync(dir);
+                        if (stats.isDirectory()) {
+                            fs.mkdirSync(workingDir)
+                            writeStuff(fileOrFolder ? path.join(fileOrFolder, file) : file);
+                        } else fs.writeFileSync(workingDir, fs.readFileSync(dir));
+                    }
+                }
+                writeStuff();
                 let OptionsPyContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Options.py"), "utf-8");
                 const APCompatiableSettings = Object.keys(apworldSettings).map(i => {
                     let info;
@@ -821,7 +830,6 @@ function continueBuildingWithBuffer(buffer, ws) {
                 for (let i = 0; i < APCompatiableSettings.length; i++) {
                     if (!APCompatiableSettings[i]) APCompatiableSettings.splice(i, 1);
                 }
-                console.log(APCompatiableSettings)
                 OptionsPyContents = OptionsPyContents.replace("ALBWOPTIONS", APCompatiableSettings.map(i => {
                     return `class ${i.className}(${i.classParam}):\n\t"""${i.desc}"""\n\tdisplay_name = "${i.displayName}"${(() => {
                         let stuff = '';
@@ -899,23 +907,12 @@ function continueBuildingWithBuffer(buffer, ws) {
                 pyInitContents = pyInitContents.replaceAll("self.options.crack_shuffle", `self.options.${CrachShuffleInfo.specific_option_name}`);
                 pyInitContents = pyInitContents.replace("OPTIONSDICT", OPTIONSDICT)
                 fs.writeFileSync(path.join(albwArchipelagoFolder, "__init__.py"), pyInitContents);
-                function writeStuff(fileOrFolder) {
-                    const fileOrFolderPath = fileOrFolder ? path.join(albwArchipelagoBuiltInFolder, fileOrFolder) : albwArchipelagoBuiltInFolder;
-                    const workingPath = fileOrFolder ? path.join(albwArchipelagoFolder, fileOrFolder) : albwArchipelagoFolder;
-                    for (const file of fs.readdirSync(fileOrFolderPath)) {
-                        const dir = path.join(fileOrFolderPath, file);
-                        const workingDir = path.join(workingPath, file);
-                        if (fs.existsSync(workingDir)) continue;
-                        const stats = fs.lstatSync(dir);
-                        if (stats.isDirectory()) {
-                            fs.mkdirSync(workingDir)
-                            writeStuff(fileOrFolder ? path.join(fileOrFolder, file) : file);
-                        } else fs.writeFileSync(workingDir, fs.readFileSync(dir));
-                    }
-                }
-                writeStuff();
                 await builder.zipALBWApworld(ZipObject, ws, albwArchipelagoFolder);
                 ws.send("\nThe build had finished successfuly!");
+                fs.rmSync(pathToWriteTempFiles, {
+                    recursive: true,
+                    force: true
+                })
                 res(await ZipObject.generateAsync({
                     type: "base64"
                 }));
