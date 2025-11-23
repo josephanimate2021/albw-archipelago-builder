@@ -72,7 +72,7 @@ wss.on('connection', async (ws, req) => {
                     return {
                         rustPathExists: fs.existsSync(path.join(userHomePath, '.cargo/bin')),
                         pythonPathExists: (
-                            process.platform == "darwin" && fs.existsSync('/Library/Frameworks/Python.framework/Versions/3.12')
+                            process.platform == "darwin" && fs.existsSync('/Library/Frameworks/Python.framework')
                         ) || (
                             process.platform == "win32" && fs.existsSync(path.join(userHomePath, './AppData/Local/Programs/Python/Python312/'))
                         ) || (
@@ -112,7 +112,7 @@ wss.on('connection', async (ws, req) => {
                             commandForInstallingProgram: `cd ${path.join(__dirname, "../utilities")} && bash python_linux.sh`,
                             message: textInstallRequired(
                                 'Python', 
-                                process.platform != "linux" ? `python-3.12.0${(() => {
+                                process.platform != "linux" ? `python-3.12.10${(() => {
                                     switch (process.platform) {
                                         case "win32": return process.env.PROCESSOR_ARCHITECTURE != "x86" ? `-${
                                             process.env.PROCESSOR_ARCHITECTURE.toLowerCase()
