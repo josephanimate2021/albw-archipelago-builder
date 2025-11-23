@@ -9,8 +9,8 @@ echo "\n$PYENV_ROOT_EXPORT" >> ~/.bashrc
 echo "\n$PYENV_PATH" >> ~/.bashrc
 echo "\n$PYENV_INIT_EXEC" >> ~/.bashrc
 echo Python paths were successfully set!
-pyenv install 3.12.0
-pyenv global 3.12.0
+pyenv install 3.12.11
+pyenv global 3.12.11
 echo Python has been downloaded and installed. The CLI Installer will be exiting in a few seconds.
 sleep 7
 exit
