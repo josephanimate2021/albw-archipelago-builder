@@ -172,7 +172,7 @@ hyrule_locations: List[LocationData] = [
     LocationData(105, None, 977, "Kakariko Well (Top)"),
     LocationData(106, 4, 138, "Kakariko Well (Bottom)"),
     LocationData(107, None, 974, "Stylish Woman"),
-    LocationData(None, None, None, "Stylish Woman (Repeat)", 0, Items.Heart),
+    LocationData(None, None, None, "Stylish Woman (Repeat)"),
     LocationData(None, None, None, "Open Stylish Woman's House", Event, Items.StylishWomansHouseOpen),
     LocationData(None, None, None, "Access Milk Bar", Event, Items.AccessMilkBar),
     LocationData(108, 2, 48, "Bee Guy (1)"),

@@ -152,7 +152,6 @@ class Items:
     MonsterHorn = ItemData(33, "Monster Horn", Junk, filler, [new_item(RItem.MonsterHorn)], 3)
     MonsterTail = ItemData(34, "Monster Tail", Junk, filler, [new_item(RItem.MonsterTail)], 4)
     HeartPiece = ItemData(35, "Piece of Heart", Normal, useful, [new_item(RItem.HeartPiece01)], 27)
-    Heart = ItemData(None, "Heart", Junk, filler, [new_item(RItem.Heart)])
     HeartContainer = ItemData(36, "Heart Container", Normal, useful, [new_item(RItem.HeartContainer01)], 10)
     Bottle = ItemData(37, "Bottle", Normal, progression, [
         new_item(RItem.Bottle01),
