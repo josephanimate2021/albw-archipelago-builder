@@ -101,7 +101,7 @@ wss.on('connection', async (ws, req) => {
                                 process.platform == "win32" ? `rustup-init${process.env.PROCESSOR_ARCHITECTURE != "x86" ? `-${
                                     process.env.PROCESSOR_ARCHITECTURE.toLowerCase()
                                 }` : ''}.exe` : `fromCommand`,
-                                true,
+                                false,
                                 true
                             )
                         }))
@@ -120,7 +120,7 @@ wss.on('connection', async (ws, req) => {
                                         case "darwin": return '-macos11.pkg'
                                     }
                                 })()}` : 'fromCommand',
-                                process.platform != "linux",
+                                false,
                                 process.platform == "linux"
                             )
                         }));
