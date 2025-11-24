@@ -905,6 +905,8 @@ function continueBuildingWithBuffer(buffer, ws) {
                 pyPatchContents = pyPatchContents.replace("OPTIONSDICT", OPTIONSDICT)
                 pyPatchContents = pyPatchContents.replace("ALBWSpecificOptionsStuff", APCompatiableSettings.map(i => `${i.className}(info["options"]["${i.specific_option_name}"])`).join(',\n\t\t\t'))
                 fs.writeFileSync(path.join(albwArchipelagoFolder, "Patch.py"), pyPatchContents);
+                fs.writeFileSync(path.join(albwArchipelagoFolder, "Locations.py"), fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Locations.py")));
+                fs.writeFileSync(path.join(albwArchipelagoFolder, "Items.py"), fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Items.py")));
                 let pyInitContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "__init__.py"), "utf-8");
                 const CrachShuffleInfo = APCompatiableSettings.find(i => i.options?.find(d => d == "any_world_pairs"))
                 pyInitContents = pyInitContents.replaceAll("CrackShuffle", CrachShuffleInfo.className);
