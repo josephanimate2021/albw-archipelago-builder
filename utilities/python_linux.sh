@@ -1,14 +1,13 @@
 echo Installing pyenv...
-curl -fsSL https://pyenv.run | bash
-echo Successfuly installed pyenv!
-echo Setting Python Paths...
-PYENV_ROOT_EXPORT='export PYENV_ROOT="$HOME/.pyenv"'
-PYENV_PATH='[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"'
-PYENV_INIT_EXEC='eval "$(pyenv init - bash)"'
-echo "\n$PYENV_ROOT_EXPORT" >> ~/.bashrc
-echo "\n$PYENV_PATH" >> ~/.bashrc
-echo "\n$PYENV_INIT_EXEC" >> ~/.bashrc
-echo Python paths were successfully set!
+curl https://pyenv.run | bash
+echo Successfuly installed pyenv! Setting up pyenv path...
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+echo pyenv path setup was successful! Installing Python Version 3.12.11...
 pyenv install 3.12.11
 pyenv global 3.12.11
 echo Python has been downloaded and installed. The CLI Installer will be exiting in a few seconds.

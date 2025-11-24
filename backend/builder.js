@@ -97,7 +97,7 @@ module.exports = {
         })
     },
     pythonExec() {
-        return `${process.platform == "linux" ? 'pyenv exec ' : ''}python${process.platform == "darwin" ? 3 : ''}`
+        return `${process.platform == "linux" ? 'export PYENV_ROOT="$HOME/.pyenv" && export PATH="$PYENV_ROOT/bin:$PATH" && eval "$(pyenv init -)" && pyenv exec ' : ''}python${process.platform == "darwin" ? 3 : ''}`
     },
     /**
      * Sends a message to the client via a WebSocket connection (From Client Side) or CLI (Testing only)
