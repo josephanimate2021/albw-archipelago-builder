@@ -5,6 +5,7 @@
 // Modules
 const cmd = require("child_process");
 const fs = require("fs");
+const builder = require("./backend/builder");
 
 if (fs.existsSync('.git')) { // Checks for updates if the user cloned this source code with git.
     console.log('Checking for updates...');
@@ -49,25 +50,13 @@ function startApp() {
 }
 
 /**
- * 
+ * Runs a provided command.
  * @param {string} command The provided command to run.
  * @returns {Promise<Number>} The closing code after the command is run.
  */
-function runCommand(command) {
+async function runCommand(command) {
     if (process.platform != "win32" && command.startsWith("start")) command = command.substring(6);
-    return new Promise((res, rej) => {
-        setTimeout(() => {
-            const args = command.split(" ");
-            const command1 = args[0];
-            args.splice(0, 1);
-            const proces = cmd.spawn(command1, args, {
-                shell: true
-            })
-            proces.stdout.on("data", d => console.log(d.toString()));
-            proces.stderr.on("data", d => console.error(d.toString()));
-            proces.on("close", res);
-        }, 4167);
-    });
+    return (await builder.executeCommand(command)).code;
 }
 
 /**

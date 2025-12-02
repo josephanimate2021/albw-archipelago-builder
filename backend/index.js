@@ -151,10 +151,10 @@ wss.on('connection', async (ws, req) => {
                 async function buildStart() {
                     if (parsedUrl.query.filePath) {
                         const filePath = decodeURIComponent(parsedUrl.query.filePath);
-                        continueBuildingWithBuffer(fs.readFileSync(filePath), ws).then(buildFinished).catch(buildFailed);
+                        continueBuildingWithBuffer(fs.readFileSync(filePath), ws, parsedUrl.query).then(buildFinished).catch(buildFailed);
                     } else if (parsedUrl.query.zipURL) {
                         const res = await fetch.default(decodeURIComponent(parsedUrl.query.zipURL));
-                        continueBuildingWithBuffer(await res.arrayBuffer(), ws).then(buildFinished).catch(buildFailed);
+                        continueBuildingWithBuffer(await res.arrayBuffer(), ws, parsedUrl.query).then(buildFinished).catch(buildFailed);
                     } else if (parsedUrl.query.useBultInSourceCode) builder.buildWithBuiltInSourceCode(ws).then(buildFinished).catch(buildFailed);
                 }
                 /**
@@ -350,11 +350,12 @@ function generateGithubResponses(forArchipelago) {
                 return new Promise(res => {
                     if (!forArchipelago) return res();
                     const term = paths[pathIndex].substring(1);
+                    const ExcludedBranches = ["readme-update-8-26", "readme-update-07-17-22", "rickfay-patch-1", "webapp", "ep_chest_icons", ""]
                     if (info[term]) info[term] = info[term].filter(
                         i => (
-                            !i.tag_name?.includes("0.3.0-dev-build")
+                            !i.tag_name?.startsWith("v0.3.0-dev-build")
                             && !i.name.includes("0.2") && !i.name.includes("0.1") && !i.name.includes("0.0") 
-                            && i.name != "readme-update-8-26" && i.name != "readme-update-07-17-22" && i.name != "rickfay-patch-1" && i.name != "webapp"
+                            && !ExcludedBranches.find(d => d == i.name)
                         )
                     );
                     if (pathIndex != paths.length - 1) return res(modifyResponses(pathIndex += 1));
@@ -369,10 +370,11 @@ function generateGithubResponses(forArchipelago) {
 
 /**
  * Allows the building of the z17-randomizer archipelago to continue if a buffer and websocket connection are present.
- * @param {ArrayBuffer} buffer 
- * @param {WebSocket} ws 
+ * @param {ArrayBuffer} buffer A zip buffer
+ * @param {WebSocket} ws A WebSocket Connection
+ * @param {object} query Info from the URL that a user provided
  */
-function continueBuildingWithBuffer(buffer, ws) {
+function continueBuildingWithBuffer(buffer, ws, query) {
     return new Promise(async (res, rej) => {
         try {
             const apworldSettings = builder.APWorldSettings();
@@ -412,29 +414,29 @@ function continueBuildingWithBuffer(buffer, ws) {
             ws.send('\nFiles were extracted successfuly! Modifying files for the build...\n');
             const z17RandomizerAPPiecesFolder = path.join(__dirname, "../apPieces/z17-randomizer");
             const albwArchipelagoAPPiecesFolder = path.join(__dirname, "../apPieces/albw-archipelago");
-            const albwArchipelagoBuiltInFolder = await gitPathCheck(path.join(dirName, "../albw-archipelago"));
             const z17randomizerBuiltInFolder = await gitPathCheck(path.join(dirName, "../z17-randomizer"));
             ws.send("\nAll folder checks were done successfuly! Continuing the build...");
             const z17randomizerFolder = path.join(pathToWriteTempFiles, fs.readdirSync(pathToWriteTempFiles)[0]);
-            const z17randomizerVersion = await (() => {
-                return new Promise((res, rej) => {
-                    try {
-                        const randoContants = fs.readFileSync(path.join(z17randomizerFolder, "randomizer/src/constants.rs"), "utf-8");
-                        res(randoContants.split(`pub const VERSION: &`)[1].split('str = "')[1].split('";')[0]);
-                    } catch {
-                        rej("The selected source code release or branch could not detect it's actual version. This is needed in order for me to build your apworld properly. Please try seleting a source code branch/release that aligns within v0.3.0 RC1.")
-                    }
-                })
-            })();
-            ws.send(`\nDetected z17 randomizer version ${z17randomizerVersion}.`);
-            const albwArchipelagoFolder = path.join(pathToWriteTempFiles, "albw-archipelago");
-            fs.mkdirSync(albwArchipelagoFolder);
+            const z17randomizerVersion = (() => {
+                try {
+                    const randoContants = fs.readFileSync(path.join(z17randomizerFolder, "randomizer/src/constants.rs"), "utf-8");
+                    return randoContants.split(`pub const VERSION: &`)[1].split('str = "')[1].split('";')[0];
+                } catch (e) {
+                    rej(e)
+                }
+            })(), z17randomizerVersionAsRelease = z17randomizerVersion.split(" ").map(d => d.toLowerCase()).join("-").split("-")[0];
+            ws.send(`\nDetected z17 randomizer version ${z17randomizerVersion.startsWith("v") ? z17randomizerVersion.substring(1) : z17randomizerVersion}.`);
             const cargoPath = path.join(z17randomizerFolder, 'Cargo.toml');
             const cargoToml = toml.parse(fs.readFileSync(cargoPath, 'utf-8'));
             cargoToml.package ||= {
                 name: "albw-randomizer",
-                version: z17randomizerVersion.substring(1).split(" ").map(d => d.toLowerCase()).join("-").split("-")[0],
-                license: "GPL-2.0-or-later"
+                version: z17randomizerVersionAsRelease.substring(1),
+                license: "GPL-2.0-or-later",
+                edition: "2021",
+                authors: [
+                    "Kevin Marsolais <kevin@kevinmarsolais.co>",
+                    "Rick Fay <rickwithanh@gmail.com>",
+                ]
             }
             if (cargoToml.package?.authors) cargoToml.package.authors.push("Caroline Madsen <randomsalience@gmail.com>");
             cargoToml.lib = {
@@ -493,7 +495,9 @@ function continueBuildingWithBuffer(buffer, ws) {
             for (const folder of ['seed/src/settings', 'modinfo/src/settings', 'settings/src']) {
                 let modInfoSettingPath = path.join(z17randomizerFolder, folder);
                 if (fs.existsSync(modInfoSettingPath)) for (
-                    const modinfoSettingFile of fs.readdirSync(modInfoSettingPath).filter(i => i != "mod.rs" && i != "lib.rs")
+                    const modinfoSettingFile of fs.readdirSync(modInfoSettingPath).filter(i => i != "mod.rs" && i != "lib.rs" && !(
+                        z17randomizerVersionAsRelease.startsWith("v0.3") && i == "logic.rs"
+                    ))
                 ) addpyclass(modInfoSettingPath, modinfoSettingFile);
             }
             const settingClassesModules = [];
@@ -519,20 +523,25 @@ function continueBuildingWithBuffer(buffer, ws) {
                                     apworldSettings[key].applyToArchipelago = true
                                 }
                                 contents = replaceWithPyClassAndOriginal(contents, setting, structBoolean ? '#[pyclass]' : '#[pyo3(get, set)]', !structBoolean ? 1 : 0);
-                            }
+                            } else settingClassesModules.push(setting.substring(25))
                         }
                         index = originalContents.indexOf("pub ", index + 4);
                     }
-                    index = originalContents.indexOf("use crate::");
-                    while (index > -1) {
-                        const setting = originalContents.substring(index).split("\n")[0];
-                        settingClassesModules.push(setting.substring(21))
-                        index = originalContents.indexOf("use crate::", index + 11);
+                    if (
+                        z17randomizerVersionAsRelease.startsWith("v0.3") && file != 'settings/src/lib.rs'
+                    ) for (let setting of originalContents.split("crate::{")[1].split("}")[0].split(" ").join("").split(",")) {
+                        if (setting.indexOf("::") > -1) settingClassesModules.push(setting + ";");
+                    } else if (settingClassesModules.length == 0) {
+                        let index = originalContents.indexOf("use crate::");
+                        while (index > -1) {
+                            const setting = originalContents.substring(index).split("\n")[0]
+                            settingClassesModules.push(setting.substring(21))
+                            index = originalContents.indexOf("use crate::", index + 11);
+                        }
                     }
                     contents = replaceWithPyClassAndOriginal(contents, 'impl Settings {', '#[pymethods]\nimpl Settings {\n\t#[new]\n\tpub fn new() -> Settings {\n\t\tSettings::default()\n\t}\n}\n');
                     fs.writeFileSync(modinfoModPath, contents);
                     sendFileModifiedMessage(modinfoModPath);
-                    break;
                 }
             }
             const libPath = path.join(z17randomizerFolder, 'src/lib.rs');
@@ -540,7 +549,12 @@ function continueBuildingWithBuffer(buffer, ws) {
             let lib2contents = fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, 'src/lib.rs'), 'utf-8');
             lib2contents = lib2contents.replace("RANDO_SETTINGS_CLASSES", settingClassesModules.map(m => m.slice(0, -1)).join(",\n\t"));
             lib2contents = lib2contents.replace("M_ADD_CLASS_SETTINGS", settingClassesModules.map(mod => `m.add_class::<${mod.split("::")[1].slice(0, -1)}>()?;`).join("\n\t"));
-            if (z17randomizerVersion.startsWith("v0.3")) lib2contents = lib2contents.replaceAll("modinfo::", "");
+            if (!fs.existsSync(path.join(z17randomizerFolder, 'modinfo/src/settings/mod.rs'))) {
+                const replace = "Settings;"
+                const seedFolderExists = fs.existsSync(path.join(z17randomizerFolder, "seed/src/settings/mod.rs"))
+                lib2contents = lib2contents.replaceAll("modinfo::", seedFolderExists ? "seed::" : ``);
+                lib2contents = lib2contents.replace(replace, seedFolderExists ? `seed::${replace}` : `{\n\tsettings::${replace.slice(0, -1)}\n}`)
+            }
             fs.writeFileSync(libPath, lib2contents);
             sendFileModifiedMessage(libPath, false);
             const randoCargoPath = path.join(z17randomizerFolder, 'randomizer/Cargo.toml');
@@ -566,10 +580,11 @@ function continueBuildingWithBuffer(buffer, ws) {
             }
             if (fs.existsSync(randoFillerPath.file('filler_item.rs'))) {
                 let fillerItemContents = fs.readFileSync(randoFillerPath.file('filler_item.rs'), 'utf-8');
+                if (fillerItemContents.includes("FillerItem")) replace[6] = "FillerItem";
                 fillerItemContents = fillerItemContents.replace(replace[1], `pub ${replace[1]}`);
                 fillerItemContents = fillerItemContents.replace(replace[0], replace[0] + "\nuse pyo3::prelude::*;\nuse std::collections::hash_map::DefaultHasher;\nuse std::hash::{Hash, Hasher};");
                 fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, '#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]', 
-                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/filler/filler_item.rs"), 'utf-8'));
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/filler/filler_item.rs"), 'utf-8').replaceAll("Randomizable", replace[6]));
                 for (const emu of ["Item", "Goal", "Vane"]) fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, `pub enum ${emu} {`);
                 fillerItemContents = fillerItemContents.replace(replace[2], replace[2] + "\n\tClearTreacherousTower,")
                 fillerItemContents = fillerItemContents.replace(replace[3], replace[3] + '\n\t\t\tSelf::ClearTreacherousTower => "Clear Treacherous Tower",')
@@ -588,8 +603,9 @@ function continueBuildingWithBuffer(buffer, ws) {
             for (const pathName of [randoFillerPath.file('location_node.rs'), path.join(z17randomizerFolder, "randomizer/src/model/location_node.rs")]) {
                 if (!fs.existsSync(pathName)) continue;
                 let fillerLocationNodeContents = fs.readFileSync(pathName, 'utf-8');
-                fillerLocationNodeContents = putTextIntoLine(25, "&self.paths", fillerLocationNodeContents, true);
-                fillerLocationNodeContents = putTextIntoLine(24, "pub fn get_paths(&self) -> &Option<Vec<Path>> {", fillerLocationNodeContents, true);
+                const selfPathsLineNumber = findTextLineNumber("self.paths", fillerLocationNodeContents);
+                fillerLocationNodeContents = putTextIntoLine(selfPathsLineNumber, "&self.paths", fillerLocationNodeContents, true);
+                fillerLocationNodeContents = putTextIntoLine(selfPathsLineNumber - 1, "pub fn get_paths(&self) -> &Option<Vec<Path>> {", fillerLocationNodeContents, true);
                 fillerLocationNodeContents = fillerLocationNodeContents.replace(replace[4], "Display, EnumString, " + replace[4]);
                 fs.writeFileSync(pathName, fillerLocationNodeContents);
                 sendFileModifiedMessage(pathName);
@@ -626,9 +642,11 @@ function continueBuildingWithBuffer(buffer, ws) {
                 fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
                 fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
                 const itemPoolsParams = accessTextFromLine(findTextLineNumber('pub fn fill_all_locations_reachable(', fillerModContents) + 3, fillerModContents).split("(")[1].split(")")[0];
-                fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', `/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (${itemPoolsParams}) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n`);
+                const cracksPlaceText = fillerModContents.includes("fn place_portals") ? 'place_portals' : 'place_cracks';
+                fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, `fn ${cracksPlaceText}`, `/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (${itemPoolsParams}) = item_pools::get_item_pools(rng, seed_info);\n\t${cracksPlaceText}(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n`);
                 fillerModContents = fillerModContents.replace(
                     'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
+                if (cracksPlaceText == "place_portals") fillerModContents = fillerModContents.replaceAll("Crack", "Portal")
                 fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
                 sendFileModifiedMessage(randoFillerPath.file('mod.rs'));
             }
@@ -655,7 +673,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             const randoLibPath = path.join(z17randomizerFolder, "randomizer/src/lib.rs");
             let randoLibContents = fs.readFileSync(randoLibPath, "utf-8");
             randoLibContents = randoLibContents.replace(replace[0], replace[0] + "\nuse crate::filler::location::Location;\nuse crate::filler::progress::Progress;\nuse pyo3::prelude::*;\nuse regex::Regex;\nuse filler::access_check;");
-            randoLibContents = randoLibContents.replace(replace[6], `{PyRandomizable, ${replace[6]}}`);
+            randoLibContents = randoLibContents.replace(replace[6], `{Py${replace[6]}, ${replace[6]}}`);
             randoLibContents = randoLibContents.replace(replace[7], replace[7] + '\n\tstr::FromStr,');
             randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub struct SeedInfo {');
             randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub settings: Settings,', '#[serde(skip_deserializing)]\n\tpub archipelago_info: Option<ArchipelagoInfo>,\n', 1);
@@ -671,8 +689,9 @@ function continueBuildingWithBuffer(buffer, ws) {
             const seedVariables = randoLibContents.split('info!("Calculating Seed Info...");')[1]?.split("let mut seed_info = ")[0];
             if (seedVariables) {
                 let randoLibPyContents = fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/lib_pyStuff.rs"), "utf-8");
-                const lineNumberForRemovedFromPlayOption = findTextLineNumber("pub removed_from_play: Vec<Randomizable>,", randoLibContents);
+                const lineNumberForRemovedFromPlayOption = findTextLineNumber(`pub removed_from_play: Vec<${replace[6]}>,`, randoLibContents);
                 if (!lineNumberForRemovedFromPlayOption) randoLibPyContents = deleteTextsFromLine(13, 1, randoLibPyContents);
+                randoLibPyContents = randoLibPyContents.replaceAll("Randomizable", replace[6]);
                 randoLibPyContents = randoLibPyContents.replace("VARS_BUILD", seedVariables.replaceAll(")?;", ").unwrap();"));
                 const vars = seedVariables.split("let ").map(i => {
                     const varName = i.split(" =")[0];
@@ -789,7 +808,7 @@ function continueBuildingWithBuffer(buffer, ws) {
             if (fs.existsSync(randoCodePatchMessageModPath)) {
                 let randoCodePatchMessageModContents = fs.readFileSync(randoCodePatchMessageModPath, "utf-8");
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[12], replace[12] + "LetterInABottle");
-                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[13], "Randomizable, " + replace[13]);
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[13], `${replace[6]}, ${replace[13]}`);
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_item_names(patcher)?;", "patch_item_names(patcher, seed_info)?;");
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_event_item_get(patcher)?;", "patch_event_item_get(patcher, seed_info.is_archipelago())?;");
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[14], replace[14] + ", seed_info: &SeedInfo")
@@ -800,7 +819,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                 randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "\tpatcher.update(item_name.dump())?;", 
                     fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_item.rs"), 'utf-8'))
                 randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "let mut street_merchant", 
-                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_streetMerchantItem.rs"), 'utf-8'))
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_streetMerchantItem.rs"), 'utf-8').replaceAll("Randomizable", replace[6]))
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("name(item_left)", "name(&item_name_left)")
                 randoCodePatchMessageModContents = randoCodePatchMessageModContents.replaceAll("name(item_right)", "name(&item_name_right)")
                 fs.writeFileSync(randoCodePatchMessageModPath, randoCodePatchMessageModContents);
@@ -869,35 +888,21 @@ function continueBuildingWithBuffer(buffer, ws) {
             }
             ws.send("\nAll files were successfuly modified! Beginning app build...");
             builder.beginBuildFrom(z17randomizerFolder, ws).then(async ZipObject => {
+                if (query.makePopTrackerPack) await createALBWPopTracker(ZipObject);
                 ws.send('\nPreparing your apworld file...');
-                function writeStuff(fileOrFolder) {
-                    const fileOrFolderPath = fileOrFolder ? path.join(albwArchipelagoBuiltInFolder, fileOrFolder) : albwArchipelagoBuiltInFolder;
-                    const workingPath = fileOrFolder ? path.join(albwArchipelagoFolder, fileOrFolder) : albwArchipelagoFolder;
-                    for (const file of fs.readdirSync(fileOrFolderPath)) {
-                        const dir = path.join(fileOrFolderPath, file);
-                        const workingDir = path.join(workingPath, file);
-                        if (fs.existsSync(workingDir)) continue;
-                        const stats = fs.lstatSync(dir);
-                        if (stats.isDirectory()) {
-                            fs.mkdirSync(workingDir)
-                            writeStuff(fileOrFolder ? path.join(fileOrFolder, file) : file);
-                        } else fs.writeFileSync(workingDir, fs.readFileSync(dir));
-                    }
-                }
-                writeStuff();
+                const APWorldContents = await JSZip.loadAsync(await (await fetch.default("https://github.com/randomsalience/albw-archipelago/archive/main.zip")).arrayBuffer());
+                const APWorldFolder = APWorldContents.folder(Object.keys(APWorldContents.files)[0]);
                 let OptionsPyContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Options.py"), "utf-8");
-                const APCompatiableSettings = Object.keys(apworldSettings).map(i => {
-                    let info;
+                let APCompatiableSettings = [];
+                for (const i in apworldSettings) {
                     if (apworldSettings[i].applyToArchipelago) {
-                        info = apworldSettings[i];
+                        let info = apworldSettings[i];
                         info.optionName = i;
                         info.specific_option_name ||= i;
+                        APCompatiableSettings.unshift(info);
                     }
-                    return info
-                })
-                for (let i = 0; i < APCompatiableSettings.length; i++) {
-                    if (!APCompatiableSettings[i]) APCompatiableSettings.splice(i, 1);
                 }
+                APCompatiableSettings = APCompatiableSettings.reverse()
                 OptionsPyContents = OptionsPyContents.replace("ALBWOPTIONS", APCompatiableSettings.map(i => {
                     return `class ${i.className}(${i.classParam}):\n\t"""${i.desc}"""\n\tdisplay_name = "${i.displayName}"${(() => {
                         let stuff = '';
@@ -932,7 +937,9 @@ function continueBuildingWithBuffer(buffer, ws) {
                             let code = '\n\t'
                             if (appliedFirstSettingCode) code += 'el';
                             else appliedFirstSettingCode = true;
-                            code += `if options.${setting.specific_option_name}.value == ${setting.className}.option_${i}:\n\t\tsettings.${setting.optionName} = albwrandomizer.${
+                            code += `if options.${setting.specific_option_name}.value == ${setting.className}.option_${i}:\n\t\tsettings${
+                                setting.category ? `.${setting.category}` : ''
+                            }.${setting.optionName} = albwrandomizer.${
                                 setting.randoSourceClass
                             }.${i.split("_").map(builder.upperCaseBegWord).join("")}`
                             return code;
@@ -947,7 +954,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                     }
                     return code;
                 })()}\n\n\treturn settings`)
-                fs.writeFileSync(path.join(albwArchipelagoFolder, "Options.py"), OptionsPyContents);
+                APWorldFolder.file(`Options.py`, OptionsPyContents);
                 let pyPatchContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Patch.py"), "utf-8"), pyPatchCount = 0, pyPatchImportedClassFirstTimePass = true;
                 pyPatchContents = pyPatchContents.replace("ALBWSpecificOptionsClasses", (() => {
                     let code = '';
@@ -965,19 +972,30 @@ function continueBuildingWithBuffer(buffer, ws) {
                 const OPTIONSDICT = APCompatiableSettings.map(i => `"${i.specific_option_name}"`).join(',\n\t\t\t\t')
                 pyPatchContents = pyPatchContents.replace("OPTIONSDICT", OPTIONSDICT)
                 pyPatchContents = pyPatchContents.replace("ALBWSpecificOptionsStuff", APCompatiableSettings.map(i => `${i.className}(info["options"]["${i.specific_option_name}"])`).join(',\n\t\t\t'))
-                fs.writeFileSync(path.join(albwArchipelagoFolder, "Patch.py"), pyPatchContents);
-                fs.writeFileSync(path.join(albwArchipelagoFolder, "Locations.py"), fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Locations.py")));
-                fs.writeFileSync(path.join(albwArchipelagoFolder, "Items.py"), fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Items.py")));
+                APWorldFolder.file(`Patch.py`, pyPatchContents);
+                APWorldFolder.file(`Locations.py`, fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "Locations.py")));
                 let pyInitContents = fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "__init__.py"), "utf-8");
+                if (APCompatiableSettings.find(i => i.className == "WeatherVanes") && !APCompatiableSettings.find(i => i.className == "WeatherVanesActivated")) pyInitContents = pyInitContents.replace(
+                    "STARTING_VANES_CONDITIONALS", fs.readFileSync(path.join(albwArchipelagoAPPiecesFolder, "__init__.WeatherVanes.py"))
+                );
+                if (APCompatiableSettings.find(i => i.className == "WeatherVanesActivated") && !APCompatiableSettings.find(i => i.className == "WeatherVanes")) pyInitContents = pyInitContents.replace(
+                    "STARTING_VANES_CONDITIONALS", "if self.options.weather_vanes_activated:\n\t\tstarting_vanes += lorule_vanes\n\t\tstarting_vanes += convenient_hyrule_vanes"
+                )
                 const CrachShuffleInfo = APCompatiableSettings.find(i => i.options?.find(d => d == "any_world_pairs"))
-                pyInitContents = pyInitContents.replaceAll("CrackShuffle", CrachShuffleInfo.className);
-                pyInitContents = pyInitContents.replace("Crack Shuffle", CrachShuffleInfo.displayName)
-                pyInitContents = pyInitContents.replace("Cracksanity", CrachShuffleInfo.randoSourceClass);
-                pyInitContents = pyInitContents.replace("cracksanity", CrachShuffleInfo.optionName);
-                pyInitContents = pyInitContents.replaceAll("self.options.crack_shuffle", `self.options.${CrachShuffleInfo.specific_option_name}`);
-                pyInitContents = pyInitContents.replace("OPTIONSDICT", OPTIONSDICT)
-                fs.writeFileSync(path.join(albwArchipelagoFolder, "__init__.py"), pyInitContents);
-                await builder.zipALBWApworld(ZipObject, ws, albwArchipelagoFolder);
+                if (CrachShuffleInfo) {
+                    pyInitContents = pyInitContents.replaceAll("CrackShuffle", CrachShuffleInfo.className);
+                    pyInitContents = pyInitContents.replace("Crack Shuffle", CrachShuffleInfo.displayName)
+                    pyInitContents = pyInitContents.replace("Cracksanity", CrachShuffleInfo.randoSourceClass);
+                    pyInitContents = pyInitContents.replace("cracksanity", CrachShuffleInfo.optionName);
+                    pyInitContents = pyInitContents.replaceAll("self.options.crack_shuffle", `self.options.${CrachShuffleInfo.specific_option_name}`);
+                } else {
+                    pyInitContents = pyInitContents.replaceAll("CrackShuffle,", "");
+                    pyInitContents = deleteTextsFromLine(108, 3, pyInitContents);
+                }
+                pyInitContents = pyInitContents.replace("OPTIONSDICT", OPTIONSDICT);
+                if (replace[6] != "Randomizable") pyInitContents = pyInitContents.replaceAll("Randomizable", replace[6])
+                APWorldFolder.file(`__init__.py`, pyInitContents);
+                await builder.zipALBWApworld(ZipObject, ws, APWorldContents);
                 ws.send("\nThe build had finished successfuly!");
                 fs.rmSync(pathToWriteTempFiles, {
                     recursive: true,
@@ -990,8 +1008,9 @@ function continueBuildingWithBuffer(buffer, ws) {
             function addpyclass(modInfoSettingPath, modinfoSettingFile) {
                 let modinfoSettingPath = path.join(modInfoSettingPath, modinfoSettingFile);
                 let contents = fs.readFileSync(modinfoSettingPath, 'utf-8');
-                contents = contents.replace(";", ";\nuse pyo3::pyclass;");
-                contents = contents.replace(")]", ")]\n#[pyclass]");
+                contents = contents.replace(replace[0], replace[0] + "\nuse pyo3::pyclass;");
+                const replace1 = ")]";
+                contents = contents.replace(replace1, replace1 + "\n#[pyclass]");
                 fs.writeFileSync(modinfoSettingPath, contents);
                 sendFileModifiedMessage(modinfoSettingPath)
             }
@@ -1052,6 +1071,153 @@ function continueBuildingWithBuffer(buffer, ws) {
             function sendFileModifiedMessage(pathToFile, fileModified = true) {
                 ws.send(`\n${fileModified ? 'Modified' : 'Created'}\n${pathToFile}\n`);
             }
+
+            /**
+             * Creates a PopTracker pack using a zip file for the ALBW EmoTracker Pack
+             * @param {JSZip} zip A JSZip Object
+             * @returns {Promise<JSZip>} A JSZip Object with the poptracker pack zip file.
+             */
+            function createALBWPopTracker(zip) {
+                return new Promise(async (res, rej) => {
+                    ws.send(`\nBy request, your poptracker pack is currently being created. Please wait...`);
+                    const builtInALBWPopTrackerSource = path.join(__dirname, "../albw-ap-poptracker");
+                    const ALBWPopTrackerAPPieces = path.join(__dirname, "../apPieces/albw-ap-poptracker");
+                    let trackerLink;
+                    switch (z17randomizerVersionAsRelease) {
+                        case "v0.4.0": {
+                            if (z17randomizerVersion.endsWith("Release")) trackerLink = trackerDownloadLink("d002c0a86d9f512bea65213a81cad49d7259a217")
+                            else trackerLink = trackerDownloadLink("6250e7c51a4b5a947caae3ca0f2ee85566cf17d0", "rickwithanh_albwr_tracker_beta.zip")
+                        } default: {
+                            if (z17randomizerVersionAsRelease.startsWith("v0.3")) {
+                                if (
+                                    z17randomizerVersion.endsWith("rc2")
+                                ) trackerLink = "https://github.com/rickfay/ALBW-Randomizer-Tracker/releases/download/v0.3.0-rc2-tracker/lemonkong_albwr_tracker.zip"
+                                else if (z17randomizerVersion.endsWith("Release")) trackerLink = trackerDownloadLink("3.2.0");
+                                else if (z17randomizerVersion.includes("dev-build")) trackerLink = `https://github.com/rickfay/ALBW-Randomizer-Tracker/releases/download/${
+                                    z17randomizerVersion.substring(z17randomizerVersionAsRelease.length + 1)
+                                }/lemonkong_albwr_tracker.zip`
+                            } else trackerLink = trackerDownloadLink("master")
+                        }
+                    }
+                    function trackerDownloadLink(branch, file = 'lemonkong_albwr_tracker.zip') {
+                        return `https://github.com/rickfay/ALBW-Randomizer-Tracker/raw/refs/heads/${branch}/docs/${file}`
+                    }
+                    ws.send(`\nDownloading and extracting the ALBW Randomizer Tracker from \n${trackerLink}...`)
+                    const contents = await JSZip.loadAsync((await fetch.default(trackerLink)).arrayBuffer());
+                    ws.send(`\nThe tracker has successfuly been downloaded and extracted. Modifying files...`);
+                    for (const layoutLocation of ["", "compact/"]) {
+                        const layoutsFolder = `${layoutLocation}layouts`;
+                        const file = `${layoutsFolder}/tracker.json`;
+                        const info = JSON.parse(await contents.file(file).async("nodebuffer"));
+                        const oldLayout = info.tracker_default;
+                        const array = [];
+                        for (const content of oldLayout.content) {
+                            if (content.type == "scroll") {
+                                if (content.dock) content.content.dock = content.dock;
+                                array.unshift(content.content);
+                            } else array.unshift(content);
+                        }
+                        oldLayout.content = array;
+                        contents.file(file, JSON.stringify(info, null, "\t"));
+                        sendFileModifiedMessage(file);
+                    }
+                    try {
+                        const file = "layouts/item_grid.json";
+                        const info = parseJSON(await contents.file(file).async("text"));
+                        const itemGrid = info.item_grid;
+                        const arrayInfo = itemGrid.content.find(i => i.type == "container");
+                        if (arrayInfo) {
+                            arrayInfo.type = "array";
+                            for (const margin of [
+                                {
+                                    original: "1,100,1,-12",
+                                    replacement: "85,-12,1,-12"
+                                },
+                                {
+                                    original: "1,106,1,1",
+                                    replacement: "1,-12,1,1"
+                                },
+                                {
+                                    original: "1,122,1,-12",
+                                    replacement: "1,-12,1,-32"
+                                }
+                            ]) {
+                                const info = arrayInfo.content.find(i => i.margin == margin.original);
+                                if (info) info.margin = margin.replacement;
+                            }
+                            contents.file(file, JSON.stringify(info, null, "\t"));
+                            sendFileModifiedMessage(file);
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        const mapsJSONFile = "maps.json"
+                        const maps = parseJSON(await contents.file(mapsJSONFile).async("text"), '[');
+                        for (const regionName of ["hyrule", "lorule"]) {
+                            const info = maps.find(i => i.name == regionName);
+                            if (info.img?.endsWith("map_blank.png")) info.img = info.img.replace('map_blank.png', `${regionName}.png`);
+                        }
+                        contents.file(mapsJSONFile, JSON.stringify(maps, null, "\t"));
+                        sendFileModifiedMessage(mapsJSONFile);
+                        try {
+                            const mapLayoutsFolder = 'layouts/maps/'
+                            const file = `${mapLayoutsFolder}worlds.json`
+                            let worldMapsLayout = await contents.file(file).async("text");
+                            worldMapsLayout = worldMapsLayout.replaceAll('"type": "scroll"', '"type": "dock"');
+                            contents.forEach(async (path, fileInfo) => {
+                                if (path.startsWith(mapLayoutsFolder) && fileInfo.name != file) try {
+                                    const content = await contents.file(path).async("text");
+                                    contents.file(path, content.replace('"type": "viewbox"', '"type": "container"'));
+                                    sendFileModifiedMessage(path);
+                                } catch {}
+                            })
+                            contents.file(file, worldMapsLayout);
+                            sendFileModifiedMessage(file);
+                        } catch {
+
+                        }
+                        const manifest = parseJSON(await contents.file("manifest.json").async("text"), "{");
+                        for (const type in manifest.variants) manifest.variants[type].flags = ["ap"];
+                        manifest.package_uid = "popTrackerPack";
+                        manifest.name = `A Link Between Worlds Randomizer Archipelago Tracker For Version ${z17randomizerVersion}`
+                        contents.file("manifest.json", JSON.stringify(manifest, null, "\t"));
+                        sendFileModifiedMessage("manifest.json");
+                        let luaInitScript = contents.file("scripts/init.lua").async("text");
+                        luaInitScript += '\n\nScriptHost:LoadScript("scripts/autotracking.lua")';
+                        contents.file("scripts/init.lua", luaInitScript);
+                        contents.file("scripts/autotracking.lua", fs.readFileSync(path.join(builtInALBWPopTrackerSource, "scripts/autotracking.lua")));
+                        const autotrackingFolderJSZip = contents.folder("scripts/autotracking");
+                        const autotrackingFolder = path.join(builtInALBWPopTrackerSource, "scripts/autotracking");
+                        for (const file of fs.readdirSync(autotrackingFolder)) autotrackingFolderJSZip.file(file, fs.readFileSync(path.join(autotrackingFolder, file)));
+                        autotrackingFolderJSZip.file("archipelago.lua", fs.readFileSync(path.join(ALBWPopTrackerAPPieces, "scripts/autotracking/archipelago.lua")));
+                        zip.file(`${manifest.package_uid}.zip`, await contents.generateAsync({
+                            type: "nodebuffer"
+                        }))
+                        ws.send("\nYour PopTracker pack was successfuly created!")
+                        res()
+                    }
+                });
+            }
+
+            /**
+             * Parses JSON text.
+             * @param {string} contents The text to parse.
+             * @returns {object} The parsed JSON
+             */
+            function parseJSON(contents, replacedFirstLineText) {
+                try {
+                    if (replacedFirstLineText) {
+                        const firstLineText = accessTextFromLine(findTextLineNumber(replacedFirstLineText, contents), contents);
+                        contents = contents.replace(firstLineText, replacedFirstLineText)
+                    }
+                    for (const lineNumber of filterTextLineNumber("//", contents)) {
+                        contents = putTextIntoLine(lineNumber, "", contents, true);
+                    }
+                    return JSON.parse(contents);
+                } catch {
+                    return contents;
+                }
+            }
             function gitPathCheck(folder) {
                 return new Promise(async (res, rej) => {
                     if (!fs.existsSync(path.join(folder, "README.md"))) try {
@@ -1060,6 +1226,19 @@ function continueBuildingWithBuffer(buffer, ws) {
                             recursive: true,
                             force: true
                         });
+                        const stats = await gitExistanceCheck().catch(rej);
+                        if (!stats) {
+                            ws.send(`\nGit exists on your computer. Using it to get the files for\n${folder}`);
+                            shellOutput().then(() => {
+                                ws.send(`\nFolder check for\n${folder}\nis complete.`);
+                                res(folder);
+                            }).catch(rej)
+                        } else {
+                            ws.send(`\nGit exists on your computer. However, you need to restart this app in order to get the files for \n${
+                                folder
+                            }. Press any key to continue.`);
+                            ws.on("message", () => rej(`Click <a href="javascript:closeApp()">here</a> to close the app.`))
+                        }
                         function shellOutput() {
                             return new Promise(async (res, rej) => {
                                 const gitModules = await (() => {
@@ -1079,14 +1258,9 @@ function continueBuildingWithBuffer(buffer, ws) {
                                         }
                                     })
                                 })()
-                                const commands = [path.join(folder, '../'), "&&", "git", "clone", gitModules.url, "--verbose"];
-                                if (gitModules.branch) {
-                                    commands.push("-b");
-                                    commands.push(gitModules.branch)
-                                }
-                                builder.shellInit(cmd.spawn("cd", commands, {
-                                    shell: true
-                                }), ws).then(() => {
+                                let command = `cd ${path.join(folder, '../')} && git clone ${gitModules.url} --verbose`;
+                                if (gitModules.branch) command += ` -b ${gitModules.branch}`
+                                builder.executeCommand(command, ws).then(() => {
                                     ws.send(`\nFiles were successfuly made in\n${folder}`);
                                     res();
                                 }).catch(rej);
@@ -1127,19 +1301,6 @@ function continueBuildingWithBuffer(buffer, ws) {
                                     }));
                                 } else res();
                             })
-                        }
-                        const stats = await gitExistanceCheck().catch(rej);
-                        if (!stats) {
-                            ws.send(`\nGit exists on your computer. Using it to get the files for\n${folder}`);
-                            shellOutput().then(() => {
-                                ws.send(`\nFolder check for\n${folder}\nis complete.`);
-                                res(folder);
-                            }).catch(rej)
-                        } else {
-                            ws.send(`\nGit exists on your computer. However, you need to restart this app in order to get the files for \n${
-                                folder
-                            }. Press any key to continue.`);
-                            ws.on("message", () => rej(`Click <a href="javascript:closeApp()">here</a> to close the app.`))
                         }
                     } catch (e) {
                         rej(e);

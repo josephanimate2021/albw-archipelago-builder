@@ -103,7 +103,7 @@ class ALBWWorld(World):
         settings = create_randomizer_settings(self.options)
         archipelago_info = albwrandomizer.ArchipelagoInfo()
         archipelago_info.name = self.player_name
-        max_tries = 20
+        max_tries = 100
         for num_tries in range(max_tries + 1):
             if num_tries == max_tries:
                 print(f"Too many attempts to generate world graph for player {self.player_name}. Turning off Crack Shuffle.")
@@ -116,14 +116,7 @@ class ALBWWorld(World):
 
         # add starting weather vanes
         starting_vanes = []
-        if self.options.weather_vanes in [WeatherVanes.option_hyrule, WeatherVanes.option_all]:
-            starting_vanes += hyrule_vanes
-        if self.options.weather_vanes in [WeatherVanes.option_lorule, WeatherVanes.option_all]:
-            starting_vanes += lorule_vanes
-        if self.options.weather_vanes == WeatherVanes.option_convenient:
-            starting_vanes += convenient_hyrule_vanes
-            if not self.options.crack_shuffle == CrackShuffle.option_off:
-                starting_vanes += convenient_lorule_vanes
+        STARTING_VANES_CONDITIONALS
         for vane in starting_vanes:
             self.options.start_inventory.value[vane.name] = 1
     

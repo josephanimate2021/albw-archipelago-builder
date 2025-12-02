@@ -71,20 +71,24 @@ function buildALBWArchipelagoViaFileExplorerMethod() {
 function buildALBWArchipelagoViaFormMethod(formElement) {
   makeFeedback(true);
   const data = serializeFormData(formElement);
-  if (data['z17-randomizer-userPrefersBuiltInSourceCodeOption'] == "on") emulateTerminal(new WebSocket(serverUrl + '/beginBuild?useBultInSourceCode=true'))
-  else if (data['z17-randomizer-userPrefersBranchOption'] == 'on') getZipURLBeforeBuild(document.getElementById('branch'), data['z17-randomizer-branch']);
-  else getZipURLBeforeBuild(document.getElementById('releaseVersion'), data['z17-randomizer-release'])
+  const userWantsPoPTrackerPack = data['z17-randomizer-userWantsPoPTrackerPackOption'] == "on";
+  if (data['z17-randomizer-userPrefersBuiltInSourceCodeOption'] == "on") emulateTerminal(new WebSocket(
+    serverUrl + '/beginBuild?useBultInSourceCode=true' + (userWantsPoPTrackerPack ? '&makePopTrackerPack=true' : '')
+  ));
+  else if (data['z17-randomizer-userPrefersBranchOption'] == 'on') getZipURLBeforeBuild(document.getElementById('branch'), data['z17-randomizer-branch'], userWantsPoPTrackerPack);
+  else getZipURLBeforeBuild(document.getElementById('releaseVersion'), data['z17-randomizer-release'], userWantsPoPTrackerPack)
 }
 
 /**
  * Obtains a ZIP url from the selected option given by the data-zipURL attribute.
  * @param {HTMLSelectElement} selectElement 
  * @param {string} origValue 
+ * @param {boolean} userWantsPoPTrackerPack 
  */
-function getZipURLBeforeBuild(selectElement, origValue) {
+function getZipURLBeforeBuild(selectElement, origValue, userWantsPoPTrackerPack) {
   for (const option of selectElement.getElementsByTagName('option')) {
     if (option.value != origValue) continue;
-    emulateTerminal(new WebSocket(serverUrl + '/beginBuild?zipURL=' + encodeURIComponent(option.getAttribute('data-zipURL'))))
+    emulateTerminal(new WebSocket(serverUrl + '/beginBuild?zipURL=' + encodeURIComponent(option.getAttribute('data-zipURL')) + (userWantsPoPTrackerPack ? '&makePopTrackerPack=true' : '')))
   }
 }
 

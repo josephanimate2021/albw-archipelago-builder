@@ -3,6 +3,7 @@ const jszip = require("jszip");
 const admzip = require("adm-zip");
 const fs = require("fs");
 const path = require("path");
+const { default: fetch } = require("node-fetch");
 
 module.exports = {
     /**
@@ -13,8 +14,10 @@ module.exports = {
      */
     beginBuildFrom(buildPath, ws) {
         return new Promise(async (res, rej) => {
+            this.sendMessageToClient(`Updating the time crate for ${buildPath} just to be safe...`, ws);
+            await this.executeCommand(`cd ${buildPath} && cargo update -p time`, ws);
             this.sendMessageToClient(
-                "Building the z17-randomizer archipelago from path: " + buildPath + ".",
+                `The time crate for ${buildPath} was updated. Building the z17-randomizer archipelago from path:  ${buildPath}.`,
                 ws
             );
             const targetPath = path.join(buildPath, 'target');
@@ -26,9 +29,6 @@ module.exports = {
                 if (info.code == 0) {
                     this.sendMessageToClient("The build was successful! Preparing your zip file for the albwrandomizer module...\n", ws);
                     const zip = new jszip();
-                    zip.file("readme.txt", `For the albw.apworld file, you may copy that to your custom_worlds folder located inside the Archipelago Folder. 
-                        for the albwrandomizer folder, you may copy that to the lib folder inside the Archipelago Folder. 
-                        Other folders like z17-randomizer and albw-archipelago are just source codes for how your albw archipelago was built.`)
                     const albwrandomizerFolder = zip.folder("albwrandomizer");
                     const wheelsFolder = path.join(targetPath, 'wheels');
                     if (fs.existsSync(wheelsFolder)) {
@@ -82,12 +82,12 @@ module.exports = {
     shellInit(shell, ws) {
         return new Promise((res, rej) => {
             shell.stdin.setEncoding("utf8")
-            ws.on('message', c => shell.stdin.write(c + "\n"));
+            if (ws) ws.on('message', c => shell.stdin.write(c + "\n"));
             shell.stdout.setEncoding("utf8")
-            shell.stdout.on('data', o => ws.send('\n' + o));
+            shell.stdout.on('data', o => this.sendMessageToClient(o, ws));
             shell.stderr.setEncoding("utf8")
-            shell.stderr.on('data', e => ws.send('\n' + e));
-            shell.stdout.on("close", code => {
+            shell.stderr.on('data', e => this.sendMessageToClient(e, ws));
+            shell.on("close", code => {
                 shell.kill();
                 res({
                     code,
@@ -115,15 +115,9 @@ module.exports = {
      */
     buildWithBuiltInSourceCode(ws) {
         return new Promise((res, rej) => {
-            const z17randomizerpath = path.join(__dirname, '../z17-randomizer');
-            const targetPath = path.join(z17randomizerpath, 'target');
-            if (fs.existsSync(targetPath)) fs.rmSync(targetPath, {
-                recursive: true,
-                force: true
-            });
-            this.beginBuildFrom(z17randomizerpath, ws).then(async ZipObject => {
-                this.sendMessageToClient("Building your albw.apworld file...", ws);
-                this.zipALBWApworld(ZipObject, ws).then(res);
+            this.beginBuildFrom(path.join(__dirname, '../z17-randomizer'), ws).then(async ZipObject => {
+                this.sendMessageToClient("Building your apworld file...", ws);
+                this.zipALBWApworld(ZipObject, ws, await jszip.loadAsync(await (await fetch("https://github.com/randomsalience/albw-archipelago/archive/main.zip")).arrayBuffer())).then(res);
             }).catch(rej);
         })
     },
@@ -131,23 +125,33 @@ module.exports = {
      * Zips Up the apworld for the albw archipelago after preparing files.
      * @param {jszip} ZipObject A JSZIp Object contining files for the albwrandomizer module.
      * @param {WebSocket} ws A WebSocket connection
-     * @param {string} folderPath A path to the python apworld folder.
+     * @param {jszip} APWorldContents A JSZip Object containing files for the downloaded apworld source code.
      * @returns {Promise<string>} A base64 string representing the zip file.
      */
-    zipALBWApworld(ZipObject, ws, folderPath = path.join(__dirname, '../albw-archipelago')) {
+    zipALBWApworld(ZipObject, ws, APWorldContents) {
         return new Promise(async (res, rej) => {
-            const albwArchipelagoFolder = ZipObject.folder("albw-archipelago");
-            const albwFolder = albwArchipelagoFolder.folder("albw");
-            await this.zipStuff(folderPath, albwFolder, ws);
-            albwFolder.file("archipelago.json", '{"compatible_version": 7, "version": 7, "game": "A Link Between Worlds", "minimum_ap_version": "0.5.0", "maximum_ap_version": "0.7.0"}');
-            ZipObject.file("albw.apworld", await albwArchipelagoFolder.generateAsync({
+            const APWorldDefaultFolder = Object.keys(APWorldContents.files)[0].slice(0, -1);
+            ZipObject.file("readme.txt", `For the ${APWorldDefaultFolder}.apworld file, you may copy that to your custom_worlds folder located inside the Archipelago Folder.
+                \nfor the albwrandomizer folder, you may copy that to the lib folder inside the Archipelago Folder.
+                \n The z17-randomizer folder does not need to be copied over anywhere because it contains the source code responsible for building your archipelago if you want to view it. 
+                \nIf you want to view the source code for your apworld, rename ${APWorldDefaultFolder}.apworld to <NEW_FILE_NAME>.zip, extract it, and boom! you have the source code!`)
+            const APWorldFolder = APWorldContents.folder(APWorldDefaultFolder);
+            APWorldFolder.file(`archipelago.json`, JSON.stringify({
+                minimum_ap_version: "0.5.0",
+                world_version: "0.1.3",
+                authors: ["randomsalience", "josephanimate2021"],
+                version: 7,
+                compatible_version: 7,
+                game: "A Link Between Worlds"
+            }));
+            ZipObject.file(`${APWorldDefaultFolder}.apworld`, await APWorldContents.generateAsync({
                 type: "nodebuffer"
             }));
             ZipObject.generateAsync({
                 type: "base64",
                 mimeType: "application/zip"
             }).then(data => {
-                this.sendMessageToClient("Successfuly generated your albw.apworld file!", ws);
+                this.sendMessageToClient(`Successfuly generated your ${APWorldDefaultFolder}.apworld file!`, ws);
                 res(data);
             }).catch(rej);
         })
@@ -177,8 +181,8 @@ module.exports = {
                 glitched: Includes the above plus a selection of easy-to-learn glitches.\n\
                 adv_glitched: Includes the above plus 'advanced' glitches that may be a challenge to master.\n\
                 hell: Includes every known RTA-viable glitch, including the insane ones. Don't choose this.\n\
-                no_logic: Items are placed with no logic at all. Seeds have a high chance of being impossible to complete\n\
-                due (primarily) to dungeon key placement, but these odds improve if this setting is combined with the Keysy setting.",
+                no_logic: Items are placed with no logic at all. Seeds have a high chance of being impossible to complete due (primarily) to dungeon key placement,\n\
+                but these odds improve if this setting is combined with the Keysy setting.",
                 className: "LogicMode",
                 classParam: "Choice",
                 displayName: "Logic Mode",
@@ -222,8 +226,10 @@ module.exports = {
             },
             trials_door: {
                 desc: "Determines the behavior of the Trial's Door in Lorule Castle.\n\
-                open_from_inside_only: The door will automatically open when the player approaches it from within the Lorule Castle dungeon, effectively skipping the need to complete any of the trials. The door will NOT be open when approached from the side with the Lorule Castle crack, preventing early access to the dungeon.\n\
-                x_trial(s)_required: X number of trials (randomly selected) must be completed to open the door.\n\
+                open_from_inside_only: The door will automatically open when the player approaches it from within the Lorule Castle dungeon, effectively skipping the need to complete any of the trials.\n\
+                The door will NOT be open when approached from the side with the Lorule Castle crack, preventing early access to the dungeon.\n\
+                x_trial(s)_required: X number of trials must be completed to open the door.\n\
+                all_trials_required: All trials must be completed to open the door.\n\
                 open_from_both_sides: The door will automatically open when approached from either side. This option may require the player to enter the dungeon early by way of the Lorule Castle crack.",
                 className: "TrialsDoor",
                 classParam: "Choice",
@@ -239,7 +245,8 @@ module.exports = {
                 default_option: "all_trials_required"
             },
             lc_requirement: {
-                desc: "Determines the number of Sages that must be rescued to open the front door to Lorule Castle. A red X will appear by the dungeon door on the bottom screen map to indicate when this requirement has been met.",
+                desc: "Determines the number of Sages that must be rescued to open the front door to Lorule Castle.\n\
+                A red X will appear by the dungeon door on the bottom screen map to indicate when this requirement has been met.",
                 className: "LoruleCastleRequirement",
                 classParam: "Range",
                 displayName: "Lorule Castle Requirement",
@@ -250,22 +257,33 @@ module.exports = {
                 default_option: 7,
                 specific_option_name: "lorule_castle_requirement"
             },
-            dungeon_prize_shuffle: {
-                desc: "Shuffles the 7 Sages and 3 Pendants amongst themselves such that each dungeon will hold a random prize.",
-                className: "RandomizeDungeonPrizes",
-                classParam: "Toggle",
-                displayName: "Randomize Dungeon Prizes",
-                specific_option_name: "randomize_dungeon_prizes"
+            hyrule_castle_setting: {
+                desc: "Choose how the Dungeon portion of Hyrule Castle should be handled\n\
+                early_lorule_castle: Opens the door tom Lorule Castle early at the start of the game.\n\
+                closed: Keeps the Lorule Castle door closed like normal.",
+                className: "HyruleCastleSetting",
+                classParam: "Choice",
+                displayName: "Hyrule Castle Setting",
+                options: [
+                    "early_lorule_castle",
+                    "closed"
+                ],
+                default_option: "early_lorule_castle"
             },
+            dungeon_prize_shuffle: this.APDungeonPrizeShuffleSettings(),
+            randomize_dungeon_prizes: this.APDungeonPrizeShuffleSettings(),
             crack_shuffle: this.APCrackSanitySettings("crack_shuffle"),
+            portal_shuffle: this.APCrackSanitySettings("portal_shuffle"),
             cracksanity: this.APCrackSanitySettings("crack_sanity"),
             weather_vanes: {
                 desc: "Determines the default state and behavior of the Weather Vanes.\n\
                 standard: All Weather Vanes will be off at the start of the game.\n\
                 shuffled: The Weather Vanes will be shuffled in 'pairs'.\n\
                 Example:\n\
-                \t- Activating Vane A enables fast travel to Vane B&NewLine;- Similarly, activating Vane B enables fast travel to Vane A.\n\
-                convenient: Weather Vanes that do not have logical requirements to them will be pre-activated at the start of the game. The specific vanes this setting will activate depend on other settings.\n\
+                \t- Activating Vane A enables fast travel to Vane \n\
+                \t- Similarly, activating Vane B enables fast travel to Vane A.\n\
+                convenient: Weather Vanes that do not have logical requirements to them will be pre-activated at the start of the game.\n\
+                The specific vanes this setting will activate depend on other settings.\n\
                 hyrule: All the Hyrule Weather Vanes will be pre-activated.\n\
                 lorule: All the Lorule Weather Vanes will be pre-activated.\n\
                 all: All Weather Vanes will be pre-activated.",
@@ -312,11 +330,40 @@ module.exports = {
                 },
                 default_option: 100
             },
+            hint_ghost_price: {
+                desc: "Price of Hints from Hint Ghosts. Can be any integer between 0 and 9999 (Recommended: 30).",
+                className: "HintGhostPrice",
+                classParam: "Range",
+                displayName: "Price For Ghost Hints",
+                range: {
+                    min: 0,
+                    max: 9999
+                },
+                default_option: 30
+            },
             super_items: {
                 desc: "This setting shuffles a second progressive copy of the Lamp and Net into the general item pool",
                 className: "SuperItems",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Super Items"
+            },
+            vanilla_charm: {
+                desc: "This setting forces one of the two Pendant of Courage Upgrades to be in Zelda's Throne Room if enabled.",
+                className: "VanillaCharm",
+                classParam: "Toggle",
+                displayName: "Vanilla Charm"
+            },
+            nice_mode: {
+                desc: "This shuffles a second progressive copy of each Ravio Item into the general item pool.",
+                className: "NiceMode",
+                classParam: "Toggle",
+                displayName: "Nice Mode"
+            },
+            weather_vanes_activated: {
+                desc: "This setting begins the game with all Weather Vanes activated.",
+                className: "WeatherVanesActivated",
+                classParam: "Toggle",
+                displayName: "Weather Vanes Activated"
             },
             lamp_and_net_as_weapons: {
                 desc: "Treat the base Lamp and Net as damage-dealing weapons?\n\
@@ -335,7 +382,7 @@ module.exports = {
             assured_weapon: {
                 desc: "Guarantees that the player will find at least one weapon in the item pool.",
                 className: "AssuredWeapon",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Assured Weapon"
             },
             maiamai_madness: {
@@ -346,15 +393,16 @@ module.exports = {
                 specific_option_name: "maiamai_mayhem"
             },
             minigames_excluded: {
-                desc: "Excludes the following minigames: Octoball Derby, Dodge the Cuccos, Hyrule Hotfoot, Treacherous Tower, and both Rupee Rushes. These minigames often require a specific skill set, which may not be suitable for all players.",
+                desc: "Excludes the following minigames: Octoball Derby, Dodge the Cuccos, Hyrule Hotfoot, Treacherous Tower, and both Rupee Rushes.\n\
+                These minigames often require a specific skill set, which may not be suitable for all players.",
                 className: "MinigamesExcluded",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Minigames Excluded"
             },
             skip_big_bomb_flower: {
                 desc: "Skips the Big Bomb Flower quest by removing the 5 Big Rocks in Lorule Field. (Does not affect the Lorule Castle Bomb Trial)",
                 className: "SkipBigBombFlower",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Skip Big Bomb Flower"
             },
             bow_of_light_in_castle: {
@@ -369,6 +417,12 @@ module.exports = {
                 classParam: "Toggle",
                 displayName: "Dark Rooms Lampless"
             },
+            reverse_sage_events: {
+                desc: "Ties Sage-related checks and events to actually rescuing that Sage.",
+                className: "ReverseSageEvents",
+                classParam: "DefaultOnToggle",
+                displayName: "Reverse Sage Events"
+            },
             swordless_mode: {
                 desc: "Removes *ALL* Swords from the game. The Bug Net becomes a required item to play Dead Man's Volley against Yuga Ganon.",
                 className: "SwordlessMode",
@@ -379,7 +433,7 @@ module.exports = {
                 desc: "All chests containing progression items will become large, and others will be made small.\n\
                 Note: Some large chests will have a reduced hitbox to prevent negative gameplay interference.",
                 className: "ChestSizeMatchesContents",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Chest Size Matches Contents"
             },
             treacherous_tower_floors: {
@@ -396,7 +450,7 @@ module.exports = {
             purple_potion_bottles: {
                 desc: "Fills all Empty Bottles with a free Purple Potion.",
                 className: "PurplePotionBottles",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Purple Potion Bottles"
             },
             keysy: {
@@ -411,24 +465,57 @@ module.exports = {
                     "all_keysy"
                 ]
             },
+            ravios_shop: {
+                desc: "This setting determines whatever or not Ravio's Shop opens at the start of the game.",
+                className: "RaviosShop",
+                classParam: "Choice",
+                displayName: "Ravio's Shop",
+                options: [
+                    "closed",
+                    "open"
+                ],
+                default_option: "open"
+            },
             door_shuffle: {
                 desc: "Randomizes the destinations of doors within dungeons.\n\
                 off: Doors are not shuffled and will lead to their vanilla destinations.\n\
                 dungeon_entrances: Doors that lead to dungeons will be shuffled amongst themselves. All other doors remain unshuffled.",
+                /* 
+                I am pretty sure that all_entrances will be an option once the all entrances shuffling is planned for door shuffling. 
+                I could be wrong though, just leaving this comment here for future reference in case this feature is planned for door shuffling.
+
+                all_entrances: All doors (including dungeons) will be shuffled which may change the player's starting position.\n\
+                This makes the game even harder, so don't enable this option unless you want to challenge yourself.
+
+
+                All but dungeon entrances can also be shuffled which can be possible if the developer of the z17 randomizer decides to also implement this option as well.
+
+                outside_entrances: All doors except for dungeons will be shuffled amongst themselves.
+                */
                 className: "DoorShuffle",
                 classParam: "Choice",
                 displayName: "Door Shuffle",
                 options: [
                     "off",
                     "dungeon_entrances"
+                    /*
+                    "all_entrances",
+                    "outside_entrances"
+                    */
                 ],
                 default_option: "off"
             },
             start_with_merge: {
                 desc: "Starts the player with the ability to Merge into walls, without Ravio's Bracelet.",
                 className: "StartWithMerge",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Start With Merge"
+            },
+            skip_trials: {
+                desc: "Automatically opens the Lorule Castle Trials door.",
+                className: "SkipTrials",
+                classParam: "Toggle",
+                displayName: "Skip Trials"
             },
             start_with_pouch: {
                 desc: "Starts the player with the Pouch and a usable X Button.",
@@ -451,7 +538,7 @@ module.exports = {
             boots_in_shop: {
                 desc: "Places the Pegasus Boots for sale in Ravio's Shop at the start of the game.",
                 className: "BootsInShop",
-                classParam: "Toggle",
+                classParam: "DefaultOnToggle",
                 displayName: "Boots In Shop"
             },
             night_mode: {
@@ -490,6 +577,15 @@ module.exports = {
             ],
             default_option: "off",
             specific_option_name
+        }
+    },
+    APDungeonPrizeShuffleSettings() {
+        return {
+            desc: "Shuffles the 7 Sages and 3 Pendants amongst themselves such that each dungeon will hold a random prize.",
+            className: "RandomizeDungeonPrizes",
+            classParam: "DefaultOnToggle",
+            displayName: "Randomize Dungeon Prizes",
+            specific_option_name: "randomize_dungeon_prizes"
         }
     },
     /**

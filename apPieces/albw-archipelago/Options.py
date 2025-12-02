@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict
-from Options import PerGameCommonOptions, Choice, Range, Toggle
+from Options import PerGameCommonOptions, Choice, Range, Toggle, DefaultOnToggle
 import albwrandomizer
 
 ALBWOPTIONS
