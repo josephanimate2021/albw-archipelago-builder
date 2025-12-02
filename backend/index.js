@@ -298,7 +298,7 @@ function generateGithubResponses(forArchipelago) {
                  */
                 function clearStuff(k) {
                     if (k) info = {
-                        message: k.toString()
+                        message: `Could not fetch some ${paths[pathIndex].substring(1)} from github's API Servers. ${k.toString()}`
                     };
                     res();
                 }
@@ -342,8 +342,8 @@ function generateGithubResponses(forArchipelago) {
         responsesFetch().then(() => {
 
             /**
-             * takes out versions of the z17 randomizer that aren't supported like ones that aren't withn range of v0.4.0 (works best with archipelago)
-             * @param {number} pathIndex The index of the current path
+             * takes out versions and branches of the z17 randomizer that may differ from working with archipelago.
+             * @param {number} pathIndex - The index of the current path
              * @returns {Promise} A way of telling the computer that the response was modified.
              */
             function modifyResponses(pathIndex = 0) {
@@ -351,7 +351,11 @@ function generateGithubResponses(forArchipelago) {
                     if (!forArchipelago) return res();
                     const term = paths[pathIndex].substring(1);
                     if (info[term]) info[term] = info[term].filter(
-                        i => !i.name.includes("0.3")  && !i.name.includes("0.2") && !i.name.includes("0.1") && !  i.name.includes("0.0")
+                        i => (
+                            !i.tag_name?.includes("0.3.0-dev-build")
+                            && !i.name.includes("0.2") && !i.name.includes("0.1") && !i.name.includes("0.0") 
+                            && i.name != "readme-update-8-26" && i.name != "readme-update-07-17-22" && i.name != "rickfay-patch-1" && i.name != "webapp"
+                        )
                     );
                     if (pathIndex != paths.length - 1) return res(modifyResponses(pathIndex += 1));
                     res()
@@ -412,10 +416,26 @@ function continueBuildingWithBuffer(buffer, ws) {
             const z17randomizerBuiltInFolder = await gitPathCheck(path.join(dirName, "../z17-randomizer"));
             ws.send("\nAll folder checks were done successfuly! Continuing the build...");
             const z17randomizerFolder = path.join(pathToWriteTempFiles, fs.readdirSync(pathToWriteTempFiles)[0]);
+            const z17randomizerVersion = await (() => {
+                return new Promise((res, rej) => {
+                    try {
+                        const randoContants = fs.readFileSync(path.join(z17randomizerFolder, "randomizer/src/constants.rs"), "utf-8");
+                        res(randoContants.split(`pub const VERSION: &`)[1].split('str = "')[1].split('";')[0]);
+                    } catch {
+                        rej("The selected source code release or branch could not detect it's actual version. This is needed in order for me to build your apworld properly. Please try seleting a source code branch/release that aligns within v0.3.0 RC1.")
+                    }
+                })
+            })();
+            ws.send(`\nDetected z17 randomizer version ${z17randomizerVersion}.`);
             const albwArchipelagoFolder = path.join(pathToWriteTempFiles, "albw-archipelago");
             fs.mkdirSync(albwArchipelagoFolder);
             const cargoPath = path.join(z17randomizerFolder, 'Cargo.toml');
             const cargoToml = toml.parse(fs.readFileSync(cargoPath, 'utf-8'));
+            cargoToml.package ||= {
+                name: "albw-randomizer",
+                version: z17randomizerVersion.substring(1).split(" ").map(d => d.toLowerCase()).join("-").split("-")[0],
+                license: "GPL-2.0-or-later"
+            }
             if (cargoToml.package?.authors) cargoToml.package.authors.push("Caroline Madsen <randomsalience@gmail.com>");
             cargoToml.lib = {
                 name: "albwrandomizer",
@@ -457,7 +477,7 @@ function continueBuildingWithBuffer(buffer, ws) {
                 fs.writeFileSync(patchModPath, replacePrintlnWithInfo(fs.readFileSync(patchModPath, 'utf-8')));
                 sendFileModifiedMessage(patchModPath);
             }
-            for (const file of ['modinfo/Cargo.toml', 'settings/Cargo.toml']) {
+            for (const file of ['modinfo/Cargo.toml', 'settings/Cargo.toml', 'seed/Cargo.toml']) {
                 const modinfoCargoPath = path.join(z17randomizerFolder, file);
                 if (fs.existsSync(modinfoCargoPath)) {
                     const modInfoToml = toml.parse(fs.readFileSync(modinfoCargoPath, 'utf-8'));
@@ -470,14 +490,18 @@ function continueBuildingWithBuffer(buffer, ws) {
                     sendFileModifiedMessage(modinfoCargoPath);
                 }
             }
-            for (const folder of ['modinfo/src/settings', 'settings/src']) {
+            for (const folder of ['seed/src/settings', 'modinfo/src/settings', 'settings/src']) {
                 let modInfoSettingPath = path.join(z17randomizerFolder, folder);
                 if (fs.existsSync(modInfoSettingPath)) for (
                     const modinfoSettingFile of fs.readdirSync(modInfoSettingPath).filter(i => i != "mod.rs" && i != "lib.rs")
                 ) addpyclass(modInfoSettingPath, modinfoSettingFile);
             }
             const settingClassesModules = [];
-            for (const file of ['modinfo/src/settings/mod.rs', 'settings/src/lib.rs']) {
+            const settingFiles = [
+                'seed/src/settings/mod.rs', 'seed/src/settings/logic.rs', 'modinfo/src/settings/mod.rs', 'settings/src/lib.rs', 'settings/src/logic.rs'
+            ]
+            if (z17randomizerVersionAsRelease.startsWith("v0.3")) settingFiles.push('modinfo/src/settings/logic.rs')
+            for (const file of settingFiles) {
                 const modinfoModPath = path.join(z17randomizerFolder, file);
                 if (fs.existsSync(modinfoModPath)) {
                     let contents = fs.readFileSync(modinfoModPath, 'utf-8');
@@ -488,18 +512,22 @@ function continueBuildingWithBuffer(buffer, ws) {
                         const setting = originalContents.substring(index).split("\n")[0];
                         if (!setting.startsWith("pub fn") && !setting.startsWith("pub mod")) {
                             const structBoolean = setting.startsWith("pub struct");
-                            if (
-                                !setting.startsWith("pub use ")
-                            ) {
+                            if (!setting.startsWith("pub use ")) {
                                 const key = setting.split(": ")[0].substring(4);
                                 if (apworldSettings[key]) {
                                     apworldSettings[key].randoSourceClass = setting.split(": ")[1].split(",")[0]
                                     apworldSettings[key].applyToArchipelago = true
                                 }
                                 contents = replaceWithPyClassAndOriginal(contents, setting, structBoolean ? '#[pyclass]' : '#[pyo3(get, set)]', !structBoolean ? 1 : 0);
-                            } else settingClassesModules.push(setting.substring(25))
+                            }
                         }
                         index = originalContents.indexOf("pub ", index + 4);
+                    }
+                    index = originalContents.indexOf("use crate::");
+                    while (index > -1) {
+                        const setting = originalContents.substring(index).split("\n")[0];
+                        settingClassesModules.push(setting.substring(21))
+                        index = originalContents.indexOf("use crate::", index + 11);
                     }
                     contents = replaceWithPyClassAndOriginal(contents, 'impl Settings {', '#[pymethods]\nimpl Settings {\n\t#[new]\n\tpub fn new() -> Settings {\n\t\tSettings::default()\n\t}\n}\n');
                     fs.writeFileSync(modinfoModPath, contents);
@@ -508,9 +536,11 @@ function continueBuildingWithBuffer(buffer, ws) {
                 }
             }
             const libPath = path.join(z17randomizerFolder, 'src/lib.rs');
+            if (!fs.existsSync(path.join(z17randomizerFolder, 'src'))) fs.mkdirSync(path.join(z17randomizerFolder, 'src'))
             let lib2contents = fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, 'src/lib.rs'), 'utf-8');
             lib2contents = lib2contents.replace("RANDO_SETTINGS_CLASSES", settingClassesModules.map(m => m.slice(0, -1)).join(",\n\t"));
-            lib2contents = lib2contents.replace("M_ADD_CLASS_SETTINGS", settingClassesModules.map(mod => `m.add_class::<${mod.split("::")[1].slice(0, -1)}>()?;`).join("\n\t"))
+            lib2contents = lib2contents.replace("M_ADD_CLASS_SETTINGS", settingClassesModules.map(mod => `m.add_class::<${mod.split("::")[1].slice(0, -1)}>()?;`).join("\n\t"));
+            if (z17randomizerVersion.startsWith("v0.3")) lib2contents = lib2contents.replaceAll("modinfo::", "");
             fs.writeFileSync(libPath, lib2contents);
             sendFileModifiedMessage(libPath, false);
             const randoCargoPath = path.join(z17randomizerFolder, 'randomizer/Cargo.toml');
@@ -530,26 +560,31 @@ function continueBuildingWithBuffer(buffer, ws) {
                     return path.join(this.root, f)
                 },
             };
-            if (fs.existsSync(randoFillerPath.file('cracks.rs'))) addpyclass(randoFillerPath.root, 'cracks.rs');
-            sendFileModifiedMessage(randoFillerPath.file('cracks.rs'));
-            let fillerItemContents = fs.readFileSync(randoFillerPath.file('filler_item.rs'), 'utf-8');
-            fillerItemContents = fillerItemContents.replace(replace[1], `pub ${replace[1]}`);
-            fillerItemContents = fillerItemContents.replace(replace[0], replace[0] + "\nuse pyo3::prelude::*;\nuse std::collections::hash_map::DefaultHasher;\nuse std::hash::{Hash, Hasher};");
-            fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, '#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]', 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/filler/filler_item.rs"), 'utf-8'));
-            fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Item {');
-            fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Goal {');
-            fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, 'pub enum Vane {');
-            fillerItemContents = fillerItemContents.replace(replace[2], replace[2] + "\n\tClearTreacherousTower,")
-            fillerItemContents = fillerItemContents.replace(replace[3], replace[3] + '\n\t\t\tSelf::ClearTreacherousTower => "Clear Treacherous Tower",')
-            fillerItemContents += '\n#[pymethods]\nimpl Vane {\n\nfn __hash__(&self) -> u64 {\n\t\tlet mut hasher = DefaultHasher::new();\n\t\tself.hash(&mut hasher);\n\t\thasher.finish()\n\t}\n}';
-            fs.writeFileSync(randoFillerPath.file('filler_item.rs'), fillerItemContents);
-            sendFileModifiedMessage(randoFillerPath.file('filler_item.rs'));
-            let fillerLocationContents = fs.readFileSync(randoFillerPath.file('location.rs'), 'utf-8');
-            fillerLocationContents = fillerLocationContents.replace(replace[0], replace[0] + "\nuse strum::{Display, EnumString};");
-            fillerLocationContents = fillerLocationContents.replace(replace[4], "Display, EnumString, " + replace[4]);
-            fs.writeFileSync(randoFillerPath.file('location.rs'), fillerLocationContents);
-            sendFileModifiedMessage(randoFillerPath.file('location.rs'));
+            if (fs.existsSync(randoFillerPath.file('cracks.rs'))) {
+                addpyclass(randoFillerPath.root, 'cracks.rs');
+                sendFileModifiedMessage(randoFillerPath.file('cracks.rs'));
+            }
+            if (fs.existsSync(randoFillerPath.file('filler_item.rs'))) {
+                let fillerItemContents = fs.readFileSync(randoFillerPath.file('filler_item.rs'), 'utf-8');
+                fillerItemContents = fillerItemContents.replace(replace[1], `pub ${replace[1]}`);
+                fillerItemContents = fillerItemContents.replace(replace[0], replace[0] + "\nuse pyo3::prelude::*;\nuse std::collections::hash_map::DefaultHasher;\nuse std::hash::{Hash, Hasher};");
+                fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, '#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]', 
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/filler/filler_item.rs"), 'utf-8'));
+                for (const emu of ["Item", "Goal", "Vane"]) fillerItemContents = replaceWithPyClassAndOriginal(fillerItemContents, `pub enum ${emu} {`);
+                fillerItemContents = fillerItemContents.replace(replace[2], replace[2] + "\n\tClearTreacherousTower,")
+                fillerItemContents = fillerItemContents.replace(replace[3], replace[3] + '\n\t\t\tSelf::ClearTreacherousTower => "Clear Treacherous Tower",')
+                fillerItemContents += '\n#[pymethods]\nimpl Vane {\n\nfn __hash__(&self) -> u64 {\n\t\tlet mut hasher = DefaultHasher::new();\n\t\tself.hash(&mut hasher);\n\t\thasher.finish()\n\t}\n}';
+                fs.writeFileSync(randoFillerPath.file('filler_item.rs'), fillerItemContents);
+                sendFileModifiedMessage(randoFillerPath.file('filler_item.rs'));
+            }
+            for (const pathName of [randoFillerPath.file('location.rs'), path.join(z17randomizerFolder, "randomizer/src/model/location.rs")]) {
+                if (!fs.existsSync(pathName)) continue;
+                let fillerLocationContents = fs.readFileSync(pathName, 'utf-8');
+                fillerLocationContents = fillerLocationContents.replace(replace[0], replace[0] + "\nuse strum::{Display, EnumString};");
+                fillerLocationContents = fillerLocationContents.replace(replace[4], "Display, EnumString, " + replace[4]);
+                fs.writeFileSync(pathName, fillerLocationContents);
+                sendFileModifiedMessage(pathName);
+            }
             for (const pathName of [randoFillerPath.file('location_node.rs'), path.join(z17randomizerFolder, "randomizer/src/model/location_node.rs")]) {
                 if (!fs.existsSync(pathName)) continue;
                 let fillerLocationNodeContents = fs.readFileSync(pathName, 'utf-8');
@@ -559,55 +594,59 @@ function continueBuildingWithBuffer(buffer, ws) {
                 fs.writeFileSync(pathName, fillerLocationNodeContents);
                 sendFileModifiedMessage(pathName);
             }
-            let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
-            fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
-            fillerModContents = fillerModContents.replace("const PROGRESSION_EVENTS: usize = 36;", "const PROGRESSION_EVENTS: usize = 37;");
-            fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
-                "fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
-            fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
-                "pub fn apply<F>(self, patcher: &mut Patcher, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
-            for (const boolean of [false, true]) {
-                fillerModContents = fillerModContents.replace(`self.prep_chest(filler_item.into().unwrap(), course, stage, unq, ${boolean}, seed_info)?;`, 
-                    `let is_big = seed_info.is_major_location(loc_name, ${boolean});\n\t\t\tself.prep_chest(filler_item.into().unwrap(), course, stage, unq, is_big, seed_info)?;`)
-            }
-            for (const info of [
-                {
-                    beg: 'self',
-                    mid: 'patch',
-                    end: 'clone'
-                },
-                {
-                    beg: 'patcher',
-                    mid: 'self',
-                    end: 'into'
+            if (fs.existsSync(randoFillerPath.file("mod.rs"))) {
+                let fillerModContents = fs.readFileSync(randoFillerPath.file("mod.rs"), 'utf-8');
+                fillerModContents = fillerModContents.replace(replace[5], 'pub ' + replace[5]);
+                fillerModContents = fillerModContents.replace("const PROGRESSION_EVENTS: usize = 36;", "const PROGRESSION_EVENTS: usize = 37;");
+                fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
+                    "fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
+                fillerModContents = fillerModContents.replace("fn apply<F>(&mut self, patch: Patch, seed_info: &SeedInfo, filler_item: F) -> Result<()>", 
+                    "pub fn apply<F>(self, patcher: &mut Patcher, seed_info: &SeedInfo, filler_item: F, loc_name: &str) -> Result<()>")
+                for (const boolean of [false, true]) {
+                    fillerModContents = fillerModContents.replace(`self.prep_chest(filler_item.into().unwrap(), course, stage, unq, ${boolean}, seed_info)?;`, 
+                        `let is_big = seed_info.is_major_location(loc_name, ${boolean});\n\t\t\tself.prep_chest(filler_item.into().unwrap(), course, stage, unq, is_big, seed_info)?;`)
                 }
-            ]) fillerModContents = fillerModContents.replace(`${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}())?;`, 
-                `${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}(), loc_name)?;`)
-            fillerModContents = fillerModContents.replace("SeedInfo { settings, .. }: &SeedInfo,", "SeedInfo { settings, archipelago_info, .. }: &SeedInfo,")
-            fillerModContents = fillerModContents.replace("let chest_data = if settings.chest_size_matches_contents {", 
-                "let chest_data = if settings.chest_size_matches_contents && archipelago_info.is_none() {")
-            fillerModContents = fillerModContents.replace("pub fn prefill_check_map(world_graph: &mut WorldGraph) -> CheckMap {", "pub fn prefill_check_map(world_graph: &WorldGraph) -> CheckMap {");
-            fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
-            fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
-            const itemPoolsParams = accessTextFromLine(findTextLineNumber('pub fn fill_all_locations_reachable(', fillerModContents) + 3, fillerModContents).split("(")[1].split(")")[0];
-            fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', `/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (${itemPoolsParams}) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n`);
-            fillerModContents = fillerModContents.replace(
-                'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
-            fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
-            sendFileModifiedMessage(randoFillerPath.file('mod.rs'));
-            let fillerProgressionContents = fs.readFileSync(randoFillerPath.file('progress.rs'), 'utf-8');
-            const rustReturnTrueIfArchipelago = 'if self.seed_info.is_archipelago() {\n\t\t\treturn true;\n\t\t}\n\n\t\t';
-            fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let heart_containers', `// Heart containers and heart pieces are not progression items in Archipelago\n\t\t${
-                rustReturnTrueIfArchipelago
-            }\n`, 2)
-            fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::EasternCompass)', rustReturnTrueIfArchipelago);
-            fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::IceCompass)', rustReturnTrueIfArchipelago);
-            fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let purples', 
-                `// Rupees are not progression items in Archipelago, so instead require Treacherous Tower for easy farming\n\t\t${
-                    'if self.seed_info.is_archipelago() {\n\t\t\treturn self.has(Goal::ClearTreacherousTower);\n\t\t}\n\n\t\t'
-                }\n`, 2);
-            fs.writeFileSync(randoFillerPath.file('progress.rs'), fillerProgressionContents);
-            sendFileModifiedMessage(randoFillerPath.file('progress.rs'));
+                for (const info of [
+                    {
+                        beg: 'self',
+                        mid: 'patch',
+                        end: 'clone'
+                    },
+                    {
+                        beg: 'patcher',
+                        mid: 'self',
+                        end: 'into'
+                    }
+                ]) fillerModContents = fillerModContents.replace(`${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}())?;`, 
+                    `${info.beg}.apply(${info.mid}, seed_info, filler_item.${info.end}(), loc_name)?;`)
+                fillerModContents = fillerModContents.replace("SeedInfo { settings, .. }: &SeedInfo,", "SeedInfo { settings, archipelago_info, .. }: &SeedInfo,")
+                fillerModContents = fillerModContents.replace("let chest_data = if settings.chest_size_matches_contents {", 
+                    "let chest_data = if settings.chest_size_matches_contents && archipelago_info.is_none() {")
+                fillerModContents = fillerModContents.replace("pub fn prefill_check_map(world_graph: &mut WorldGraph) -> CheckMap {", "pub fn prefill_check_map(world_graph: &WorldGraph) -> CheckMap {");
+                fillerModContents = fillerModContents.replace("for location_node in world_graph.values_mut() {", "for location_node in world_graph.values() {");
+                fillerModContents = fillerModContents.replace('layout.set(loc_info, item);', `else {\n\t\t\t\t\tpanic!("No item placed at {}", loc_info.name);\n\t\t\t\t}`);
+                const itemPoolsParams = accessTextFromLine(findTextLineNumber('pub fn fill_all_locations_reachable(', fillerModContents) + 3, fillerModContents).split("(")[1].split(")")[0];
+                fillerModContents = replaceWithPyClassAndOriginal(fillerModContents, 'fn place_cracks', `/// Verify all locations are reachable without actually filling them\npub fn access_check(rng: &mut StdRng, seed_info: &SeedInfo, check_map: &mut CheckMap) -> bool {\n\tlet (${itemPoolsParams}) = item_pools::get_item_pools(rng, seed_info);\n\tplace_cracks(seed_info, check_map);\n\tplace_weather_vanes(seed_info, check_map);\n\tverify_all_locations_accessible(seed_info, check_map, &mut progression_pool).is_ok()\n}\n`);
+                fillerModContents = fillerModContents.replace(
+                    'let item = check_map.get(check.get_name()).unwrap().unwrap();', `if let Some(item) = check_map.get(check.get_name()).unwrap() {\n\t\t\t\t\tlayout.set(loc_info, *item);\n\t\t\t\t}`);
+                fs.writeFileSync(randoFillerPath.file('mod.rs'), fillerModContents);
+                sendFileModifiedMessage(randoFillerPath.file('mod.rs'));
+            }
+            if (fs.existsSync(randoFillerPath.file('progress.rs'))) {
+                let fillerProgressionContents = fs.readFileSync(randoFillerPath.file('progress.rs'), 'utf-8');
+                const rustReturnTrueIfArchipelago = 'if self.seed_info.is_archipelago() {\n\t\t\treturn true;\n\t\t}\n\n\t\t';
+                fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let heart_containers', `// Heart containers and heart pieces are not progression items in Archipelago\n\t\t${
+                    rustReturnTrueIfArchipelago
+                }\n`, 2)
+                fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::EasternCompass)', rustReturnTrueIfArchipelago);
+                fillerProgressionContents = replaceFillerCompass(fillerProgressionContents, 'self.has(Item::IceCompass)', rustReturnTrueIfArchipelago);
+                fillerProgressionContents = replaceWithPyClassAndOriginal(fillerProgressionContents, 'let purples', 
+                    `// Rupees are not progression items in Archipelago, so instead require Treacherous Tower for easy farming\n\t\t${
+                        'if self.seed_info.is_archipelago() {\n\t\t\treturn self.has(Goal::ClearTreacherousTower);\n\t\t}\n\n\t\t'
+                    }\n`, 2);
+                fs.writeFileSync(randoFillerPath.file('progress.rs'), fillerProgressionContents);
+                sendFileModifiedMessage(randoFillerPath.file('progress.rs'));
+            }
             /* This is causing so many building errors with the source code for some reason, but I will reconsider adding this back soon as it was part of commit #20ad861
             on the archipelago branch of caroline's fork of the z17 randomizer source code.
             const regionsModPath = path.join(z17randomizerFolder, "randomizer/src/regions/mod.rs");
@@ -629,132 +668,144 @@ function continueBuildingWithBuffer(buffer, ws) {
             randoLibContents = replaceWithPyClassAndOriginal(
                 randoLibContents, '#[derive(Serialize, Deserialize, Debug)]', fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, 'randomizer/src/lib_stripCharactersFromString.rs'), 'utf-8')
             )
-            const seedVariables = randoLibContents.split('info!("Calculating Seed Info...");')[1].split("let mut seed_info = ")[0];
-            let randoLibPyContents = fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/lib_pyStuff.rs"), "utf-8");
-            const lineNumberForRemovedFromPlayOption = findTextLineNumber("pub removed_from_play: Vec<Randomizable>,", randoLibContents);
-            if (!lineNumberForRemovedFromPlayOption) randoLibPyContents = deleteTextsFromLine(13, 1, randoLibPyContents);
-            randoLibPyContents = randoLibPyContents.replace("VARS_BUILD", seedVariables.replaceAll(")?;", ").unwrap();"));
-            const vars = seedVariables.split("let ").map(i => {
-                const varName = i.split(" =")[0];
-                if (varName.indexOf(" ") == -1) return varName + ",\n\t\t";
-            }).join("");
-            randoLibPyContents = randoLibPyContents.replace("MAPS", vars);
-            randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub fn patch_seed(', randoLibPyContents);
+            const seedVariables = randoLibContents.split('info!("Calculating Seed Info...");')[1]?.split("let mut seed_info = ")[0];
+            if (seedVariables) {
+                let randoLibPyContents = fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/lib_pyStuff.rs"), "utf-8");
+                const lineNumberForRemovedFromPlayOption = findTextLineNumber("pub removed_from_play: Vec<Randomizable>,", randoLibContents);
+                if (!lineNumberForRemovedFromPlayOption) randoLibPyContents = deleteTextsFromLine(13, 1, randoLibPyContents);
+                randoLibPyContents = randoLibPyContents.replace("VARS_BUILD", seedVariables.replaceAll(")?;", ").unwrap();"));
+                const vars = seedVariables.split("let ").map(i => {
+                    const varName = i.split(" =")[0];
+                    if (varName.indexOf(" ") == -1) return varName + ",\n\t\t";
+                }).join("");
+                randoLibPyContents = randoLibPyContents.replace("MAPS", vars);
+                randoLibContents = replaceWithPyClassAndOriginal(randoLibContents, 'pub fn patch_seed(', randoLibPyContents);
+            }
             fs.writeFileSync(randoLibPath, randoLibContents);
             sendFileModifiedMessage(randoLibPath);
             const randoBymalPatchPath = path.join(z17randomizerFolder, "randomizer/src/patch/byaml/stage.rs");
-            let randoBymalPatchContents = fs.readFileSync(randoBymalPatchPath, "utf-8");
-            randoBymalPatchContents = replaceWithPyClassAndOriginal(randoBymalPatchContents, "patch_ice_ruins(patcher);", "patch_npc_hinox(patcher);");
-            randoBymalPatchContents = replaceWithPyClassAndOriginal(randoBymalPatchContents, 
-                "//noinspection ALL", fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/byaml/stage.rs"), "utf-8"));
-            fs.writeFileSync(randoBymalPatchPath, randoBymalPatchContents);
-            sendFileModifiedMessage(randoBymalPatchPath);
-            const randoCodePatchDataPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/data.rs");
-            const randoCodePatchDataContents = fs.readFileSync(randoCodePatchDataPath, "utf-8");
-            fs.writeFileSync(randoCodePatchDataPath, replaceWithPyClassAndOriginal(randoCodePatchDataContents, "pub fn cmp<O>(rn: Register, operand2: O) -> Instruction",
-                "pub fn sub<O>(rd: Register, rn: Register, operand2: O) -> Instruction\nwhere\n\tO: Into<ShifterOperand>,\n\t{\n\t\tinstruction(operand2.into().code(), 0b0010, false, rn, rd)\n\t}\n"));
-            sendFileModifiedMessage(randoCodePatchDataPath);
-            const randoCodePatchlsPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/ls.rs");
-            let randoCodePatchlsContents = fs.readFileSync(randoCodePatchlsPath, "utf-8");
-            randoCodePatchlsContents = randoCodePatchlsContents.replace('Self { rn, plus: true, offset: Offset::Register(rm) }', ([
-                'Self { rn, plus: true, offset: Offset::Register(rm, 0) }', '\t}', '}', '\nimpl From<(Register, Register, u32)> for AddressingMode {',
-                '\tfn from(parameter: (Register, Register, u32)) -> Self {', '\t\tlet (rn, rm, shift) = parameter;', '\t\tSelf { rn, plus: true, offset: Offset::Register(rm, shift) }'
-            ]).join("\n"));
-            randoCodePatchlsContents = randoCodePatchlsContents.replace("Register(Register)", "Register(Register, u32)");
-            randoCodePatchlsContents = randoCodePatchlsContents.replace(
-                "Self::Register(register) => register.shift(0) | 0x3000000", "Self::Register(register, shift) => register.shift(0) | (shift << 7) | 0x3000000");
-            
-            fs.writeFileSync(randoCodePatchlsPath, randoCodePatchlsContents);
-            sendFileModifiedMessage(randoCodePatchlsPath);
-            const randoCodePatchArmModPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/mod.rs");
-            const randoCodePatchArmModContents = fs.readFileSync(randoCodePatchArmModPath, "utf-8");
-            fs.writeFileSync(randoCodePatchArmModPath, replaceWithPyClassAndOriginal(randoCodePatchArmModContents, 
-                'pub fn assemble<A, const N: usize>(start: A, instructions: [Instruction; N]) -> Box<[u8]>', ([
-                    'pub fn bx(register: Register) -> Instruction {', '\tInstruction::Raw(0xe12fff10 | (register as u32))', '}', '', '', 'pub fn blx(register: Register) -> Instruction {', 
-                    '\tInstruction::Raw(0xe12fff30 | (register as u32))', '}']).join("\n")));
-            sendFileModifiedMessage(randoCodePatchArmModPath);
-            const randoCodePatchModPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/mod.rs");
-            let randoCodePatchModContents = fs.readFileSync(randoCodePatchModPath, "utf-8");
-            randoCodePatchModContents = randoCodePatchModContents.replace("code.patch(0x2922A0, [b(progressive_charm)]);", "code.patch(0x2922A0, [b(progressive_ore)]);");
-            randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, 'code.patch(0x2922A0, [b(progressive_ore)]);', 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/code/mod_progressiveOre.rs"), "utf-8"));
-            randoCodePatchModContents = randoCodePatchModContents.replace("const FN_GET_LOCAL_FLAG_3: u32 = 0x52a05c;", "")
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("FN_GET_LOCAL_FLAG_3", "FN_GET_EVENT_FLAG")
-            randoCodePatchModContents = randoCodePatchModContents.replace("const FN_SET_LOCAL_FLAG_3: u32 = 0x1bb724;", "")
-            randoCodePatchModContents = randoCodePatchModContents.replace("const MAP_MANAGER_INSTANCE: u32 = 0x70c8e0;", "")
-            const textLineFromProgressiveBowVar = findTextLineNumber("let progressive_bow = code.text().define([", randoCodePatchModContents) + 5;
-            randoCodePatchModContents = deleteTextsFromLine(textLineFromProgressiveBowVar, 5, randoCodePatchModContents);
-            randoCodePatchModContents = putTextIntoLine(textLineFromProgressiveBowVar, "\t\tmov(R5, 0x11).eq(),\n\t\tmov(R5, 0x55).ne(),", randoCodePatchModContents);
-            const textLineFromProgressiveSwordVar = findTextLineNumber("let progressive_sword =", randoCodePatchModContents) + 8;
-            randoCodePatchModContents = putTextIntoLine(textLineFromProgressiveSwordVar, "\t\t\tcmp(R3, 5),\n\t\t\tmov(R3, 4).eq(),", randoCodePatchModContents);
-            const textLineForMaiamiEventFlag = findTextLineNumber("let fn_set_local3_flag_for_this_upgrade = code.text().define([", randoCodePatchModContents) + 3;
-            randoCodePatchModContents = deleteTextsFromLine(textLineForMaiamiEventFlag, 2, randoCodePatchModContents);
-            randoCodePatchModContents = putTextIntoLine(textLineForMaiamiEventFlag, "\t\t\tldr(R1, offset + NEW_EVENT_FLAGS_START_IDX),", randoCodePatchModContents);
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("fn_set_local3_flag_for_this_upgrade", "fn_set_event_flag_for_this_upgrade");
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("FN_SET_LOCAL_FLAG_3", "FN_SET_EVENT_FLAG");
-            const textLineForItemStuffCodeMod = findTextLineNumber("for (offset, addr, item) in [", randoCodePatchModContents) + 1;
-            randoCodePatchModContents = deleteTextsFromLine(textLineForItemStuffCodeMod, 9, randoCodePatchModContents);
-            randoCodePatchModContents = putTextIntoLine(textLineForItemStuffCodeMod, ([
-                "\t\t(4, 0x3100f8, bow),", "(3, 0x3100f0, boomerang),", "(11, 0x310128, hookshot),", "(6, 0x310100, hammer),",
-                "(2, 0x310130, bombs),", "(8, 0x310110, fire_rod),", "(9, 0x310118, ice_rod),", "(10, 0x310120, tornado_rod),", "(7, 0x310108, sand_rod),"
-            ]).join("\n\t\t"), randoCodePatchModContents);
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("fn_get_maiamai_flag3", "fn_get_maiamai_flag")
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("thing", "fn_get_maiamai_flag")
-            const textLineNumbersForGettingMaiamaiEventFlags = filterTextLineNumber("let fn_get_maiamai_flag = code.text().define([", randoCodePatchModContents);
-            const textLineNumbersForGettingMaiamaiEventFlagLast = textLineNumbersForGettingMaiamaiEventFlags[0] + 1;
-            randoCodePatchModContents = deleteTextsFromLine(textLineNumbersForGettingMaiamaiEventFlagLast, 2, randoCodePatchModContents);
-            randoCodePatchModContents = putTextIntoLine(
-                textLineNumbersForGettingMaiamaiEventFlagLast, "\t\tldr(R2, NEW_EVENT_FLAGS_START_IDX),\n\t\tadd(R1, R2, R1),\n\t\tldr(R0, EVENT_FLAG_PTR),", randoCodePatchModContents);
-            textLineNumbersForGettingMaiamaiEventFlags.splice(0, 1);
-            for (var i = 0; i < textLineNumbersForGettingMaiamaiEventFlags.length; i++) {
-                const lineNumber = textLineNumbersForGettingMaiamaiEventFlags[i] + 1;
-                randoCodePatchModContents = deleteTextsFromLine(lineNumber, 2, randoCodePatchModContents);
-                randoCodePatchModContents = putTextIntoLine(lineNumber, "\t\tldr(R1, NEW_EVENT_FLAGS_START_IDX),\n\t\tadd(R1, R1, R4),\n\t\tldr(R0, EVENT_FLAG_PTR),", randoCodePatchModContents);
+            if (fs.existsSync(randoBymalPatchPath)) {
+                let randoBymalPatchContents = fs.readFileSync(randoBymalPatchPath, "utf-8");
+                randoBymalPatchContents = replaceWithPyClassAndOriginal(randoBymalPatchContents, "patch_ice_ruins(patcher);", "patch_npc_hinox(patcher);");
+                randoBymalPatchContents = replaceWithPyClassAndOriginal(randoBymalPatchContents, 
+                    "//noinspection ALL", fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/byaml/stage.rs"), "utf-8"));
+                fs.writeFileSync(randoBymalPatchPath, randoBymalPatchContents);
+                sendFileModifiedMessage(randoBymalPatchPath);
             }
-            randoCodePatchModContents = randoCodePatchModContents.replaceAll("ldr(R0, (R0, 0x40)),", "");
-            randoCodePatchModContents = randoCodePatchModContents.replace("const NEW_LOCAL_FLAGS_START_IDX: u32 = 300;", "const NEW_EVENT_FLAGS_START_IDX: u32 = 861;");
-            randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, "#[allow(unused_variables)]", 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/code/mod_ap.rs"), "utf-8"));
-            randoCodePatchModContents = randoCodePatchModContents.replace(replace[11], "seed_info.is_archipelago() || " + replace[11]);
-            randoCodePatchModContents = randoCodePatchModContents.replace("code.patch(0x3455B8, [b(0x345578)]);", "code.patch(0x3455C0, [bl(0x2558DC)]);");
-            randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, "let actor_names", "// This must be called first so the Archipelago header goes in the correct location\
-            \n\tif let Some(info) = &seed_info.archipelago_info {\n\t\t\tpatch_archipelago(&mut code, seed_info.seed, &info.name);\n\t}");
-            randoCodePatchModContents = randoCodePatchModContents.replace(replace[10], "bx, blx, " + replace[10]);
-            randoCodePatchModContents = randoCodePatchModContents.replace(replace[9], "sub, " + replace[9]);
-            randoCodePatchModContents = randoCodePatchModContents.replace("MAP_MANAGER_INSTANCE", "EVENT_FLAG_PTR")
-            fs.writeFileSync(randoCodePatchModPath, randoCodePatchModContents);
-            sendFileModifiedMessage(randoCodePatchModPath);
+            const randoCodePatchDataPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/data.rs");
+            if (fs.existsSync(randoCodePatchDataPath)) {
+                const randoCodePatchDataContents = fs.readFileSync(randoCodePatchDataPath, "utf-8");
+                fs.writeFileSync(randoCodePatchDataPath, replaceWithPyClassAndOriginal(randoCodePatchDataContents, "pub fn cmp<O>(rn: Register, operand2: O) -> Instruction",
+                    "pub fn sub<O>(rd: Register, rn: Register, operand2: O) -> Instruction\nwhere\n\tO: Into<ShifterOperand>,\n\t{\n\t\tinstruction(operand2.into().code(), 0b0010, false, rn, rd)\n\t}\n"));
+                sendFileModifiedMessage(randoCodePatchDataPath);
+            }
+            const randoCodePatchlsPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/ls.rs");
+            if (fs.existsSync(randoCodePatchlsPath)) {
+                let randoCodePatchlsContents = fs.readFileSync(randoCodePatchlsPath, "utf-8");
+                randoCodePatchlsContents = randoCodePatchlsContents.replace('Self { rn, plus: true, offset: Offset::Register(rm) }', ([
+                    'Self { rn, plus: true, offset: Offset::Register(rm, 0) }', '\t}', '}', '\nimpl From<(Register, Register, u32)> for AddressingMode {',
+                    '\tfn from(parameter: (Register, Register, u32)) -> Self {', '\t\tlet (rn, rm, shift) = parameter;', '\t\tSelf { rn, plus: true, offset: Offset::Register(rm, shift) }'
+                ]).join("\n"));
+                randoCodePatchlsContents = randoCodePatchlsContents.replace("Register(Register)", "Register(Register, u32)");
+                randoCodePatchlsContents = randoCodePatchlsContents.replace(
+                    "Self::Register(register) => register.shift(0) | 0x3000000", "Self::Register(register, shift) => register.shift(0) | (shift << 7) | 0x3000000");
+                
+                fs.writeFileSync(randoCodePatchlsPath, randoCodePatchlsContents);
+                sendFileModifiedMessage(randoCodePatchlsPath);
+            }
+            const randoCodePatchArmModPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/arm/mod.rs");
+            if (fs.existsSync(randoCodePatchArmModPath)) {
+                const randoCodePatchArmModContents = fs.readFileSync(randoCodePatchArmModPath, "utf-8");
+                fs.writeFileSync(randoCodePatchArmModPath, replaceWithPyClassAndOriginal(randoCodePatchArmModContents, 
+                    'pub fn assemble<A, const N: usize>(start: A, instructions: [Instruction; N]) -> Box<[u8]>', ([
+                        'pub fn bx(register: Register) -> Instruction {', '\tInstruction::Raw(0xe12fff10 | (register as u32))', '}', '', '', 'pub fn blx(register: Register) -> Instruction {', 
+                        '\tInstruction::Raw(0xe12fff30 | (register as u32))', '}']).join("\n")));
+                sendFileModifiedMessage(randoCodePatchArmModPath);
+            }
+            const randoCodePatchModPath = path.join(z17randomizerFolder, "randomizer/src/patch/code/mod.rs");
+            if (fs.existsSync(randoCodePatchModPath)) {            
+                let randoCodePatchModContents = fs.readFileSync(randoCodePatchModPath, "utf-8");
+                randoCodePatchModContents = randoCodePatchModContents.replace("code.patch(0x2922A0, [b(progressive_charm)]);", "code.patch(0x2922A0, [b(progressive_ore)]);");
+                randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, 'code.patch(0x2922A0, [b(progressive_ore)]);', 
+                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/code/mod_progressiveOre.rs"), "utf-8"));
+                randoCodePatchModContents = randoCodePatchModContents.replace("const FN_GET_LOCAL_FLAG_3: u32 = 0x52a05c;", "")
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("FN_GET_LOCAL_FLAG_3", "FN_GET_EVENT_FLAG")
+                randoCodePatchModContents = randoCodePatchModContents.replace("const FN_SET_LOCAL_FLAG_3: u32 = 0x1bb724;", "")
+                randoCodePatchModContents = randoCodePatchModContents.replace("const MAP_MANAGER_INSTANCE: u32 = 0x70c8e0;", "")
+                const textLineFromProgressiveBowVar = findTextLineNumber("let progressive_bow = code.text().define([", randoCodePatchModContents) + 5;
+                randoCodePatchModContents = deleteTextsFromLine(textLineFromProgressiveBowVar, 5, randoCodePatchModContents);
+                randoCodePatchModContents = putTextIntoLine(textLineFromProgressiveBowVar, "\t\tmov(R5, 0x11).eq(),\n\t\tmov(R5, 0x55).ne(),", randoCodePatchModContents);
+                const textLineFromProgressiveSwordVar = findTextLineNumber("let progressive_sword =", randoCodePatchModContents) + 8;
+                randoCodePatchModContents = putTextIntoLine(textLineFromProgressiveSwordVar, "\t\t\tcmp(R3, 5),\n\t\t\tmov(R3, 4).eq(),", randoCodePatchModContents);
+                const textLineForMaiamiEventFlag = findTextLineNumber("let fn_set_local3_flag_for_this_upgrade = code.text().define([", randoCodePatchModContents) + 3;
+                randoCodePatchModContents = deleteTextsFromLine(textLineForMaiamiEventFlag, 2, randoCodePatchModContents);
+                randoCodePatchModContents = putTextIntoLine(textLineForMaiamiEventFlag, "\t\t\tldr(R1, offset + NEW_EVENT_FLAGS_START_IDX),", randoCodePatchModContents);
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("fn_set_local3_flag_for_this_upgrade", "fn_set_event_flag_for_this_upgrade");
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("FN_SET_LOCAL_FLAG_3", "FN_SET_EVENT_FLAG");
+                const textLineForItemStuffCodeMod = findTextLineNumber("for (offset, addr, item) in [", randoCodePatchModContents) + 1;
+                randoCodePatchModContents = deleteTextsFromLine(textLineForItemStuffCodeMod, 9, randoCodePatchModContents);
+                randoCodePatchModContents = putTextIntoLine(textLineForItemStuffCodeMod, ([
+                    "\t\t(4, 0x3100f8, bow),", "(3, 0x3100f0, boomerang),", "(11, 0x310128, hookshot),", "(6, 0x310100, hammer),",
+                    "(2, 0x310130, bombs),", "(8, 0x310110, fire_rod),", "(9, 0x310118, ice_rod),", "(10, 0x310120, tornado_rod),", "(7, 0x310108, sand_rod),"
+                ]).join("\n\t\t"), randoCodePatchModContents);
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("fn_get_maiamai_flag3", "fn_get_maiamai_flag")
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("thing", "fn_get_maiamai_flag")
+                const textLineNumbersForGettingMaiamaiEventFlags = filterTextLineNumber("let fn_get_maiamai_flag = code.text().define([", randoCodePatchModContents);
+                const textLineNumbersForGettingMaiamaiEventFlagLast = textLineNumbersForGettingMaiamaiEventFlags[0] + 1;
+                randoCodePatchModContents = deleteTextsFromLine(textLineNumbersForGettingMaiamaiEventFlagLast, 2, randoCodePatchModContents);
+                randoCodePatchModContents = putTextIntoLine(
+                    textLineNumbersForGettingMaiamaiEventFlagLast, "\t\tldr(R2, NEW_EVENT_FLAGS_START_IDX),\n\t\tadd(R1, R2, R1),\n\t\tldr(R0, EVENT_FLAG_PTR),", randoCodePatchModContents);
+                textLineNumbersForGettingMaiamaiEventFlags.splice(0, 1);
+                for (var i = 0; i < textLineNumbersForGettingMaiamaiEventFlags.length; i++) {
+                    const lineNumber = textLineNumbersForGettingMaiamaiEventFlags[i] + 1;
+                    randoCodePatchModContents = deleteTextsFromLine(lineNumber, 2, randoCodePatchModContents);
+                    randoCodePatchModContents = putTextIntoLine(lineNumber, "\t\tldr(R1, NEW_EVENT_FLAGS_START_IDX),\n\t\tadd(R1, R1, R4),\n\t\tldr(R0, EVENT_FLAG_PTR),", randoCodePatchModContents);
+                }
+                randoCodePatchModContents = randoCodePatchModContents.replaceAll("ldr(R0, (R0, 0x40)),", "");
+                randoCodePatchModContents = randoCodePatchModContents.replace("const NEW_LOCAL_FLAGS_START_IDX: u32 = 300;", "const NEW_EVENT_FLAGS_START_IDX: u32 = 861;");
+                randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, "#[allow(unused_variables)]", 
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/code/mod_ap.rs"), "utf-8"));
+                randoCodePatchModContents = randoCodePatchModContents.replace(replace[11], "seed_info.is_archipelago() || " + replace[11]);
+                randoCodePatchModContents = randoCodePatchModContents.replace("code.patch(0x3455B8, [b(0x345578)]);", "code.patch(0x3455C0, [bl(0x2558DC)]);");
+                randoCodePatchModContents = replaceWithPyClassAndOriginal(randoCodePatchModContents, "let actor_names", "// This must be called first so the Archipelago header goes in the correct location\
+                    \n\tif let Some(info) = &seed_info.archipelago_info {\n\t\t\tpatch_archipelago(&mut code, seed_info.seed, &info.name);\n\t}");
+                randoCodePatchModContents = randoCodePatchModContents.replace(replace[10], "bx, blx, " + replace[10]);
+                randoCodePatchModContents = randoCodePatchModContents.replace(replace[9], "sub, " + replace[9]);
+                randoCodePatchModContents = randoCodePatchModContents.replace("MAP_MANAGER_INSTANCE", "EVENT_FLAG_PTR")
+                fs.writeFileSync(randoCodePatchModPath, randoCodePatchModContents);
+                sendFileModifiedMessage(randoCodePatchModPath);
+            }
             const randoPatchlmsbfPath = path.join(z17randomizerFolder, "randomizer/src/patch/lms/msbf.rs");
-            let randoPatchlmsbfContents = fs.readFileSync(randoPatchlmsbfPath, "utf-8");
-            randoPatchlmsbfContents = randoPatchlmsbfContents.replace(replace[0], replace[0] + "\nuse rom::flag::Flag;");
-            randoPatchlmsbfContents = randoPatchlmsbfContents.replace("[90] => 91, // Skip 2nd Zelda text", "[70 convert_into_action] each [ // Skip 2nd Zelda text and set an event flag\n\t\t\t\t= 0xE,\n\t\t\t\targ1(6),\n\t\t\t\tvalue(Flag::ZELDA_BOW.get_value().into()),\n\t\t\t],");
-            const lineNumberForInsertingActionConverter = findTextLineNumber("[0x25] => 0x37,", randoPatchlmsbfContents) + 1;
-            randoPatchlmsbfContents = putTextIntoLine(lineNumberForInsertingActionConverter, "\t\t\t[0x26] each [\n\t\t\t\t= 0xE, // Change to event flag\n\t\t\t\tvalue(Flag::NPC_HINOX.get_value().into()),\n\t\t\t],", randoPatchlmsbfContents);
-            fs.writeFileSync(randoPatchlmsbfPath, randoPatchlmsbfContents);
-            sendFileModifiedMessage(randoPatchlmsbfPath);
+            if (fs.existsSync(randoPatchlmsbfPath)) {
+                let randoPatchlmsbfContents = fs.readFileSync(randoPatchlmsbfPath, "utf-8");
+                randoPatchlmsbfContents = randoPatchlmsbfContents.replace(replace[0], replace[0] + "\nuse rom::flag::Flag;");
+                randoPatchlmsbfContents = randoPatchlmsbfContents.replace("[90] => 91, // Skip 2nd Zelda text", "[70 convert_into_action] each [ // Skip 2nd Zelda text and set an event flag\n\t\t\t\t= 0xE,\n\t\t\t\targ1(6),\n\t\t\t\tvalue(Flag::ZELDA_BOW.get_value().into()),\n\t\t\t],");
+                const lineNumberForInsertingActionConverter = findTextLineNumber("[0x25] => 0x37,", randoPatchlmsbfContents) + 1;
+                randoPatchlmsbfContents = putTextIntoLine(lineNumberForInsertingActionConverter, "\t\t\t[0x26] each [\n\t\t\t\t= 0xE, // Change to event flag\n\t\t\t\tvalue(Flag::NPC_HINOX.get_value().into()),\n\t\t\t],", randoPatchlmsbfContents);
+                fs.writeFileSync(randoPatchlmsbfPath, randoPatchlmsbfContents);
+                sendFileModifiedMessage(randoPatchlmsbfPath);
+            }
             const randoCodePatchMessageModPath = path.join(z17randomizerFolder, "randomizer/src/patch/messages/mod.rs");
-            let randoCodePatchMessageModContents = fs.readFileSync(randoCodePatchMessageModPath, "utf-8");
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[12], replace[12] + "LetterInABottle");
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[13], "Randomizable, " + replace[13]);
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_item_names(patcher)?;", "patch_item_names(patcher, seed_info)?;");
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_event_item_get(patcher)?;", "patch_event_item_get(patcher, seed_info.is_archipelago())?;");
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[14], replace[14] + ", seed_info: &SeedInfo")
-            const itemGetEventFunctionLine = findTextLineNumber(replace[15], randoCodePatchMessageModContents) + 18;
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[15], replace[15] + ", archipelago: bool")
-            randoCodePatchMessageModContents = putTextIntoLine(itemGetEventFunctionLine,
-                'if archipelago {\n\t\t\tmsbt.set("message_bottle", "You got an Archipelago item!")\n\t\t}', randoCodePatchMessageModContents);
-            randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "\tpatcher.update(item_name.dump())?;", 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_item.rs"), 'utf-8'))
-            randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "let mut street_merchant", 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_streetMerchantItem.rs"), 'utf-8'))
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("name(item_left)", "name(&item_name_left)")
-            randoCodePatchMessageModContents = randoCodePatchMessageModContents.replaceAll("name(item_right)", "name(&item_name_right)")
-            fs.writeFileSync(randoCodePatchMessageModPath, randoCodePatchMessageModContents);
-            sendFileModifiedMessage(randoCodePatchMessageModPath);
-            fs.writeFileSync(path.join(z17randomizerFolder, "randomizer/src/patch/mod.rs"), replacePrintlnWithInfo(
-                fs.readFileSync(path.join(z17randomizerFolder, "randomizer/src/patch/mod.rs"), 'utf-8')
-            ));
-            sendFileModifiedMessage(path.join(z17randomizerFolder, "randomizer/src/patch/mod.rs"));
+            if (fs.existsSync(randoCodePatchMessageModPath)) {
+                let randoCodePatchMessageModContents = fs.readFileSync(randoCodePatchMessageModPath, "utf-8");
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[12], replace[12] + "LetterInABottle");
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[13], "Randomizable, " + replace[13]);
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_item_names(patcher)?;", "patch_item_names(patcher, seed_info)?;");
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("patch_event_item_get(patcher)?;", "patch_event_item_get(patcher, seed_info.is_archipelago())?;");
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[14], replace[14] + ", seed_info: &SeedInfo")
+                const itemGetEventFunctionLine = findTextLineNumber(replace[15], randoCodePatchMessageModContents) + 18;
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace(replace[15], replace[15] + ", archipelago: bool")
+                randoCodePatchMessageModContents = putTextIntoLine(itemGetEventFunctionLine,
+                    'if archipelago {\n\t\t\tmsbt.set("message_bottle", "You got an Archipelago item!")\n\t\t}', randoCodePatchMessageModContents);
+                randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "\tpatcher.update(item_name.dump())?;", 
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_item.rs"), 'utf-8'))
+                randoCodePatchMessageModContents = replaceWithPyClassAndOriginal(randoCodePatchMessageModContents, "let mut street_merchant", 
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/patch/messages/mod_streetMerchantItem.rs"), 'utf-8'))
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replace("name(item_left)", "name(&item_name_left)")
+                randoCodePatchMessageModContents = randoCodePatchMessageModContents.replaceAll("name(item_right)", "name(&item_name_right)")
+                fs.writeFileSync(randoCodePatchMessageModPath, randoCodePatchMessageModContents);
+                sendFileModifiedMessage(randoCodePatchMessageModPath);
+            } else return rej("The selected source code release or branch cannot be converted into an Archipelago build. This is because there isn't any code inside the source that is responsible for patching messages in ALBW and that is needed in order for an Archipelago Item to be able to get sent out to another game alongside ALBW.")
             writeReplacementChestNums(path.join(z17randomizerFolder, "randomizer/src/regions/dungeons/desert.rs"), {
                 "[DP] (2F) Beamos Room": 276,
                 "[DP] (2F) Under Rock (Ball Room)": 545
@@ -765,47 +816,57 @@ function continueBuildingWithBuffer(buffer, ws) {
                 "[SP] (1F) West Room": 373
             });
             const hyruleWorldPath = path.join(z17randomizerFolder, "randomizer/src/world/hyrule.rs");
-            let hyruleWorldContents = fs.readFileSync(hyruleWorldPath, "utf-8");
-            hyruleWorldContents = hyruleWorldContents.replace(replace[16], replace[16] + " p.are_cracks_open() && ");
-            fs.writeFileSync(hyruleWorldPath, hyruleWorldContents);
-            sendFileModifiedMessage(hyruleWorldPath);
-            const loruleWorldPath = path.join(z17randomizerFolder, "randomizer/src/world/lorule.rs");
-            let loruleWorldContents = fs.readFileSync(loruleWorldPath, "utf-8");
-            loruleWorldContents = replaceWithPyClassAndOriginal(loruleWorldContents, '\t\t\t\t\tcheck!("[Mai] Lorule Mountain W Skull", regions::lorule::death::mountain::SUBREGION => {', 
-                fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/world/lorule.rs"), "utf-8"))
-            fs.writeFileSync(loruleWorldPath, loruleWorldContents);
-            sendFileModifiedMessage(loruleWorldPath);
-            const worldModPath = path.join(z17randomizerFolder, "randomizer/src/world/mod.rs");
-            let worldModContents = fs.readFileSync(worldModPath, "utf-8");
-            worldModContents = replaceWithPyClassAndOriginal(worldModContents, "graph", "check_map: DashMap<String, Check>,");
-            worldModContents = worldModContents.replace("Self { graph: Default::default() }", `
-                Self { graph: Default::default(), check_map: Default::default() }
+            if (fs.existsSync(hyruleWorldPath)) {
+                let hyruleWorldContents = fs.readFileSync(hyruleWorldPath, "utf-8");
+                hyruleWorldContents = hyruleWorldContents.replace(replace[16], replace[16] + " p.are_cracks_open() && ");
+                fs.writeFileSync(hyruleWorldPath, hyruleWorldContents);
+                sendFileModifiedMessage(hyruleWorldPath);
             }
+            const loruleWorldPath = path.join(z17randomizerFolder, "randomizer/src/world/lorule.rs");
+            if (fs.existsSync(loruleWorldPath)) {
+                let loruleWorldContents = fs.readFileSync(loruleWorldPath, "utf-8");
+                loruleWorldContents = replaceWithPyClassAndOriginal(loruleWorldContents, '\t\t\t\t\tcheck!("[Mai] Lorule Mountain W Skull", regions::lorule::death::mountain::SUBREGION => {', 
+                    fs.readFileSync(path.join(z17RandomizerAPPiecesFolder, "randomizer/src/world/lorule.rs"), "utf-8"))
+                fs.writeFileSync(loruleWorldPath, loruleWorldContents);
+                sendFileModifiedMessage(loruleWorldPath);
+            }
+            const worldModPath = path.join(z17randomizerFolder, "randomizer/src/world/mod.rs");
+            if (fs.existsSync(worldModPath)) {
+                let worldModContents = fs.readFileSync(worldModPath, "utf-8");
+                worldModContents = replaceWithPyClassAndOriginal(worldModContents, "graph", "check_map: DashMap<String, Check>,");
+                worldModContents = worldModContents.replace("Self { graph: Default::default() }", `
+                    Self { graph: Default::default(), check_map: Default::default() }
+                }
 
-            fn compute_check_map(&mut self) {
-                self.check_map = Default::default();
-                for location_node in self.graph.values() {
-                    if let Some(checks) = location_node.get_checks() {
-                        for check in checks {
-                            self.check_map.insert(check.get_name().to_string(), check.clone());
+                fn compute_check_map(&mut self) {
+                    self.check_map = Default::default();
+                    for location_node in self.graph.values() {
+                        if let Some(checks) = location_node.get_checks() {
+                            for check in checks {
+                                self.check_map.insert(check.get_name().to_string(), check.clone());
+                            }
                         }
                     }
                 }
-            }
 
-            pub fn get_check(&self, name: &str) -> Option<&Check> {
-                self.check_map.get(name)`);
-            worldModContents = putTextIntoLine(94, '\tworld.compute_check_map();', worldModContents);
-            fs.writeFileSync(worldModPath, worldModContents);
-            sendFileModifiedMessage(worldModPath);
+                pub fn get_check(&self, name: &str) -> Option<&Check> {
+                    self.check_map.get(name)`);
+                worldModContents = putTextIntoLine(94, '\tworld.compute_check_map();', worldModContents);
+                fs.writeFileSync(worldModPath, worldModContents);
+                sendFileModifiedMessage(worldModPath);
+            }
             const worldTurtlePath = path.join(z17randomizerFolder, "randomizer/src/world/turtle.rs");
-            let worldTurtleContents = fs.readFileSync(worldTurtlePath, "utf-8");
-            worldTurtleContents = worldTurtleContents.replaceAll("p.has_turtle_keys(1)", "p.has_turtle_keys(3)");
-            fs.writeFileSync(worldTurtlePath, worldTurtleContents);
-            sendFileModifiedMessage(worldTurtlePath);
+            if (fs.existsSync(worldTurtlePath)) {
+                let worldTurtleContents = fs.readFileSync(worldTurtlePath, "utf-8");
+                worldTurtleContents = worldTurtleContents.replaceAll("p.has_turtle_keys(1)", "p.has_turtle_keys(3)");
+                fs.writeFileSync(worldTurtlePath, worldTurtleContents);
+                sendFileModifiedMessage(worldTurtlePath);
+            }
             const romFlagPath = path.join(z17randomizerFolder, "rom/src/flag.rs");
-            fs.writeFileSync(romFlagPath, replaceWithPyClassAndOriginal(fs.readFileSync(romFlagPath, "utf-8"), '920: WV_YOUR_HOUSE,', '861: NPC_HINOX,\n\t\t862: ZELDA_BOW,', 2));
-            sendFileModifiedMessage(romFlagPath);
+            if (fs.existsSync(romFlagPath)) {
+                fs.writeFileSync(romFlagPath, replaceWithPyClassAndOriginal(fs.readFileSync(romFlagPath, "utf-8"), '920: WV_YOUR_HOUSE,', '861: NPC_HINOX,\n\t\t862: ZELDA_BOW,', 2));
+                sendFileModifiedMessage(romFlagPath);
+            }
             ws.send("\nAll files were successfuly modified! Beginning app build...");
             builder.beginBuildFrom(z17randomizerFolder, ws).then(async ZipObject => {
                 ws.send('\nPreparing your apworld file...');
