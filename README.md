@@ -12,7 +12,7 @@ app to build your Archipelago from
 older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
 The oldest z17 randomizer release I think that I can get this app to build at is Version 0.3.0 Release Candidate 1. I could do older releases as well, but that would prevent the player from being able to recieve an Archipelago Item which
 pretty much defeats the whole purpose of having A Link Between Worlds work with Archipelago. I could do an app where building a webapp with all z17 randomizer releases could work as that dosen't require much Archipelago tinkering.
-If this [source code link](./branch/webapp) works, that means that progress for the app is underway.
+If this [source code link](../webapp) works, that means that progress for the app is underway.
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
