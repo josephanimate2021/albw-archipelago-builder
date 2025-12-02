@@ -1,27 +1,18 @@
-# The Legend of Zelda: A Link Between Worlds Archipelago Builder
-This is an application that makes the process of building The Legend of Zelda: A Link Between Worlds Randomizer on Archipelago easier by removing most of the ability to modify the z17 randomizer source code manually 
-and then building it that way as some developers won't know what tools you need to distribute a rust app as a python module.
+# The Legend of Zelda: A Link Between Worlds Webapp Builder
+This is an application that makes the process of building The web randomizer for A Link Between Worlds Randomizer alot easier by removing most of the ability to modify the z17 randomizer source code manually 
+and then building it that way as some developers won't know what tools you need to distribute a rust app as a usable GUI.
 
 ## Current bugs and issues
-* In this app's current state, you cannot build your apworld on versions older than
-v0.4.0. On the branch selection screen, try avoiding a branch that has it's
-build version older than v0.4.0. I am
-just leaving those in for testing
-purposes to ensure that I can get this
-app to build your Archipelago from
-older versions of the source code. Because you are able to select a release version the frst time the app loads, i removed releases older than v0.4.0 to avoid confusion, same attempt on the branch selection screen as well.
-The oldest z17 randomizer release I think that I can get this app to build at is Version 0.3.0 Release Candidate 1. I could do older releases as well, but that would prevent the player from being able to recieve an Archipelago Item which
-pretty much defeats the whole purpose of having A Link Between Worlds work with Archipelago. I could do an app where building a webapp with all z17 randomizer releases could work as that dosen't require much Archipelago tinkering.
-If this [source code link](./branch/webapp) works, that means that progress for the app is underway.
+* None so far, except I need to remove some code for Archipelago as this branch does not assist in building your Archipelago App. if you want the archipelago builder for The Legend of Zelda: A Link Between Worlds, click [here](../master)
 
 ## Running from the source
 This method is not recommended for most people as you won't get the most up to date source code by running the app this way. 
 However, if you want to contribute to this app, here are the steps that you can take to run this app from the source:
 1. Download <a href="https://nodejs.org/">Node.JS Version 22 LTS or above</a>.
-2. Download the <a href="../../archive/master.zip">Source Code ZIP File</a>.
+2. Download the <a href="../../archive/webapp.zip">Source Code ZIP File</a>.
 3. Extract the Source Code ZIP file to a folder of your choice.
 4. Go inside the extracted zip file and you should at least see the package.json file along with the README.md file and others if you did things correctly.
-   NOTE: You can also clone this repository by running the ```git clone https://github.com/josephanimate2021/albw-archipelago-builder.git --recurse-submodules``` command inside your terminal to achieve the same result, this will give you the
+   NOTE: You can also clone this repository by running the ```git clone https://github.com/josephanimate2021/albw-archipelago-builder.git --recurse-submodules --branch webapp``` command inside your terminal to achieve the same result, this will give you the
    benefit of getting updates every time a new commit is created on this repo.
 5. Double click on the run_from_source.bat (or run_from_source.sh if you're not running Windows on your computer) file. This will start up the app where you can do any testing you need to. DevTools will even open by default. Happy hacking!
 
